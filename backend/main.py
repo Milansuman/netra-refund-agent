@@ -44,6 +44,7 @@ def login(data: LoginData, response: Response):
         )
         return session_id
     except ValueError:
+        response.status_code = 400
         return {
             "error": "Invalid credentials"
         }
