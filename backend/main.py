@@ -35,10 +35,15 @@ class LoginData(BaseModel):
 
 @app.post("/login")
 def login(data: LoginData, response: Response):
-    session_id = users.login(db, data.username_or_email, data.password)
-    response.set_cookie(
-        key="SESSION",
-        value=session_id,
-        httponly=True
-    )
-    return session_id
+    try:
+        session_id = users.login(db, data.username_or_email, data.password)
+        response.set_cookie(
+            key="SESSION",
+            value=session_id,
+            httponly=True
+        )
+        return session_id
+    except ValueError:
+        return {
+            "error": "Invalid credentials"
+        }
