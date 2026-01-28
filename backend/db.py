@@ -50,7 +50,11 @@ class Database:
         cursor = self.connection.cursor()
         try:
             cursor.execute(query, params)
-            return cursor.fetchall()
+            self.connection.commit()
+            try:
+                return cursor.fetchall()
+            except psycopg.ProgrammingError:
+                return []
         except Exception as e:
             self.connection.rollback()
             raise e
@@ -61,6 +65,7 @@ class Database:
         cursor = self.connection.cursor()
         try:
             cursor.executemany(query, params_seq, returning=True)
+            self.connection.commit()
             results: list[tuple] = []
             for result_cursor in cursor.results():
                 results.append(*result_cursor.fetchall())
