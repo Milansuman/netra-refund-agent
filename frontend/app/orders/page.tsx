@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, RotateCcw } from "lucide-react";
+import { ArrowLeft, Package, RotateCcw, Truck, CheckCircle2, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -77,25 +77,44 @@ export default function OrdersPage() {
     }).format(priceInPaisa / 100);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status.toUpperCase()) {
       case "DELIVERED":
-        return "text-emerald-600 bg-emerald-50 border-emerald-100";
+        return {
+          color: "text-emerald-700 bg-emerald-50 border-emerald-200",
+          icon: CheckCircle2,
+          label: "Delivered"
+        };
       case "PROCESSING":
-        return "text-blue-600 bg-blue-50 border-blue-100";
-      case "CANCELLED":
-        return "text-red-600 bg-red-50 border-red-100";
+        return {
+          color: "text-amber-700 bg-amber-50 border-amber-200",
+          icon: Clock,
+          label: "Processing"
+        };
+      case "SHIPPED":
+        return {
+          color: "text-blue-700 bg-blue-50 border-blue-200",
+          icon: Truck,
+          label: "Shipped"
+        };
       default:
-        return "text-neutral-600 bg-neutral-50 border-neutral-100";
+        return {
+          color: "text-neutral-700 bg-neutral-50 border-neutral-200",
+          icon: Package,
+          label: status
+        };
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen grid place-items-center bg-neutral-50 text-neutral-500">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p>Loading your orders...</p>
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-neutral-50 via-white to-indigo-50/30">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 animate-pulse"></div>
+            <div className="absolute inset-0 h-16 w-16 rounded-2xl border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div>
+          </div>
+          <p className="text-neutral-500 font-medium">Loading your orders...</p>
         </div>
       </div>
     );
@@ -103,11 +122,17 @@ export default function OrdersPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen grid place-items-center bg-neutral-50">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
+      <div className="min-h-screen grid place-items-center bg-gradient-to-br from-neutral-50 via-white to-red-50/30">
+        <div className="text-center space-y-4">
+          <div className="h-20 w-20 rounded-3xl bg-red-50 flex items-center justify-center mx-auto">
+            <Package className="h-10 w-10 text-red-400" />
+          </div>
+          <div>
+            <p className="text-red-600 font-medium mb-2">{error}</p>
+            <p className="text-neutral-500 text-sm">Please try again later</p>
+          </div>
           <Link href="/landing">
-            <Button>Back to Shop</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-500">Back to Shop</Button>
           </Link>
         </div>
       </div>
@@ -115,127 +140,172 @@ export default function OrdersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 font-sans text-neutral-900">
-      <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-md">
+    <main className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-indigo-50/30 font-sans text-neutral-900">
+      {/* Decorative background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200/30 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-violet-200/20 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 border-b border-neutral-200/60 bg-white/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link
             href="/landing"
-            className="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-indigo-600 transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-indigo-600 transition-all hover:-translate-x-0.5 group"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
             Back to Shop
           </Link>
-          <span className="text-xl font-bold tracking-tighter text-indigo-600">
+          <Link href="/landing" className="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
             Velora.
-          </span>
+          </Link>
           <div className="w-24"></div>
         </div>
       </nav>
 
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-neutral-900 mb-6">
-          Your Orders
-        </h1>
+      <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-neutral-900 mb-2">Your Orders</h1>
+          <p className="text-neutral-500">Track, return, or manage your purchases</p>
+        </div>
 
+        {/* Order Stats */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-2xl border border-neutral-200/60 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-2xl font-bold text-neutral-900">{orders.length}</p>
+            <p className="text-sm text-neutral-500">Total Orders</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-neutral-200/60 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-2xl font-bold text-emerald-600">
+              {orders.filter(o => o.status === "DELIVERED").length}
+            </p>
+            <p className="text-sm text-neutral-500">Delivered</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-neutral-200/60 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-2xl font-bold text-amber-600">
+              {orders.filter(o => o.status === "PROCESSING").length}
+            </p>
+            <p className="text-sm text-neutral-500">Processing</p>
+          </div>
+        </div>
+
+        {/* Orders List */}
         <div className="space-y-6">
           {orders.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border border-neutral-200 text-neutral-500">
-              You have no orders yet.
+            <div className="text-center py-16 bg-white rounded-3xl border border-neutral-200/60 shadow-sm">
+              <div className="h-24 w-24 rounded-3xl bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+                <Package className="h-12 w-12 text-neutral-400" />
+              </div>
+              <p className="text-neutral-600 font-medium mb-2">No orders yet</p>
+              <p className="text-neutral-400 text-sm mb-6">Start shopping to see your orders here</p>
+              <Link href="/landing">
+                <Button className="bg-indigo-600 hover:bg-indigo-500">
+                  Browse Products
+                </Button>
+              </Link>
             </div>
           ) : (
-            orders.map((order) => (
-              <div
-                key={order.id}
-                className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="bg-neutral-50 px-6 py-4 border-b border-neutral-100 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex gap-8 text-sm">
-                    <div>
-                      <p className="text-neutral-500">Order ID</p>
-                      <p className="font-medium text-neutral-900">
-                        VEL-{order.id.toString().padStart(6, "0")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-neutral-500">Total</p>
-                      <p className="font-medium text-neutral-900">
-                        {formatPrice(order.paid_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-neutral-500">Payment</p>
-                      <p className="font-medium text-neutral-900">
-                        {order.payment_method}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
-                        order.status
-                      )}`}
-                    >
-                      {order.status}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6 space-y-4">
-                  {order.order_items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-4 pb-4 border-b border-neutral-100 last:border-0 last:pb-0"
-                    >
-                      <div className="relative h-20 w-20 flex-shrink-0 rounded-md bg-neutral-100 overflow-hidden border border-neutral-200">
-                        <Image
-                          src="https://images.unsplash.com/photo-1607083206968-13611e3d76db?auto=format&fit=crop&w=200&q=80"
-                          alt={item.product.title}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-neutral-900">
-                          {item.product.title}
-                        </h3>
-                        <p className="text-sm text-neutral-500 mt-1 line-clamp-1">
-                          {item.product.description}
+            orders.map((order, index) => {
+              const statusConfig = getStatusConfig(order.status);
+              const StatusIcon = statusConfig.icon;
+              
+              return (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-3xl border border-neutral-200/60 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 group"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  {/* Order Header */}
+                  <div className="bg-gradient-to-r from-neutral-50 to-white px-6 py-4 border-b border-neutral-100 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Order ID</p>
+                        <p className="font-semibold text-neutral-900">
+                          VEL-{order.id.toString().padStart(6, "0")}
                         </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <p className="text-sm text-indigo-600 font-semibold">
-                            {formatPrice(item.unit_price)} × {item.quantity}
-                          </p>
-                          {item.discounts.length > 0 && (
-                            <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-200">
-                              {item.discounts[0].code}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-3 flex gap-3">
-                          <Button
-                            size="sm"
-                            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-500"
-                          >
-                            <Package className="mr-2 h-3 w-3" />
-                            Track Package
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs"
-                          >
-                            <RotateCcw className="mr-2 h-3 w-3" />
-                            Return Item
-                          </Button>
-                        </div>
+                      </div>
+                      <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
+                      <div className="hidden sm:block">
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total</p>
+                        <p className="font-semibold text-neutral-900">{formatPrice(order.paid_amount)}</p>
+                      </div>
+                      <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
+                      <div className="hidden sm:block">
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Payment</p>
+                        <p className="font-medium text-neutral-700 text-sm">{order.payment_method}</p>
                       </div>
                     </div>
-                  ))}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${statusConfig.color}`}>
+                      <StatusIcon className="h-3.5 w-3.5" />
+                      {statusConfig.label}
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div className="p-6 space-y-4">
+                    {order.order_items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex gap-4 p-4 rounded-2xl hover:bg-neutral-50 transition-colors group/item"
+                      >
+                        <div className="relative h-24 w-24 flex-shrink-0 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-50 overflow-hidden border border-neutral-200/60 group-hover/item:border-indigo-200 transition-colors">
+                          <Image
+                            src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=200&q=80"
+                            alt={item.product.title}
+                            fill
+                            className="object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-neutral-900 group-hover/item:text-indigo-600 transition-colors">
+                            {item.product.title}
+                          </h3>
+                          <p className="text-sm text-neutral-500 mt-1 line-clamp-1">
+                            {item.product.description}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <p className="text-sm font-semibold text-indigo-600">
+                              {formatPrice(item.unit_price)}
+                            </p>
+                            <span className="text-neutral-300">×</span>
+                            <span className="text-sm text-neutral-600">{item.quantity}</span>
+                            {item.discounts.length > 0 && (
+                              <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                {item.discounts[0].code}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-4 flex gap-2">
+                            <Button
+                              size="sm"
+                              className="h-9 text-xs bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-lg shadow-indigo-200/50 rounded-xl"
+                            >
+                              <Truck className="mr-2 h-3.5 w-3.5" />
+                              Track
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 text-xs rounded-xl hover:bg-neutral-50"
+                            >
+                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                              Return
+                            </Button>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-neutral-300 group-hover/item:text-indigo-400 transition-colors self-center" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
+
       {/* Refund Assistant */}
       <AskAssistantDialog />
     </main>
