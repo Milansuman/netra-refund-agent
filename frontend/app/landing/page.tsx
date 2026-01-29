@@ -1,8 +1,14 @@
+"use client";
+
 import Image from "next/image";
-import { AskAssistantSheet } from "@/components/ask-assistant-sheet";
+import { LoginPopover } from "@/components/login-popover";
+import { RegisterPopover } from "@/components/register-popover";
 import { AskAssistantDialog } from "@/components/ask-assistant-dialog";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Search, Menu, ArrowRight, Star } from "lucide-react";
+import { ShoppingBag, Search, Menu, ArrowRight, Star, Package, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 
 // Modernized Product Data
 const featuredProducts = [
@@ -64,6 +70,68 @@ const categories = [
 ];
 
 export default function Page() {
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+
+  // Check if user is already logged in on mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/me", {
+        credentials: "include",
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setIsLoggedIn(true);
+        setUsername(data.username);
+      }
+    } catch (err) {
+      // User not logged in
+      setIsLoggedIn(false);
+    }
+  };
+
+  // Updated handler for Shopping Bag
+  const handleCartClick = (e: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (isLoggedIn) {
+      router.push("/cart");
+    } else {
+      setShowLogin(true);
+    }
+  };
+
+  const handleOrdersClick = (e: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (isLoggedIn) {
+      router.push("/orders");
+    } else {
+      setShowLogin(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("http://localhost:8000/logout", { 
+        method: "POST", 
+        credentials: "include" 
+      });
+      
+      setIsLoggedIn(false);
+      setUsername("");
+      router.push("/landing");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Navigation */}
@@ -77,12 +145,40 @@ export default function Page() {
               <a href="#" className="hover:text-indigo-600 transition-colors">New Arrivals</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">Electronics</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">Fashion</a>
-              <a href="#" className="hover:text-indigo-600 transition-colors">Deals</a>
             </div>
+            
+            <LoginPopover 
+                open={showLogin} 
+                onOpenChange={(open: boolean) => {
+                    setShowLogin(open);
+                    if (!open && !showRegister) {
+                         // Fetch user info after login
+                         checkAuthStatus();
+                    }
+                }}
+                onSwitchToRegister={() => {
+                    setShowLogin(false);
+                    setShowRegister(true);
+                }}
+            />
+            <RegisterPopover
+                open={showRegister}
+                onOpenChange={(open: boolean) => {
+                    setShowRegister(open);
+                     if (!open && !showLogin) {
+                         // After registration, user needs to login
+                         setShowLogin(true);
+                    }
+                }}
+                onSwitchToLogin={() => {
+                    setShowRegister(false);
+                    setShowLogin(true);
+                }}
+            />
           </div>
 
           <div className="flex items-center gap-4">
-             <div className="relative hidden sm:block">
+            <div className="relative hidden sm:block">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400" />
               <input
                 type="text"
@@ -90,14 +186,45 @@ export default function Page() {
                 className="h-9 w-64 rounded-full bg-neutral-100 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
               />
             </div>
-            
-            <button className="relative p-2 text-neutral-600 hover:text-indigo-600 transition-colors">
-              <ShoppingBag className="h-5 w-5" />
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                0
-              </span>
+
+            <button 
+                onClick={handleOrdersClick}
+                className="p-2 text-neutral-600 hover:text-indigo-600 transition-colors flex flex-col items-center gap-0.5"
+                title="Orders"
+            >
+              <Package className="h-5 w-5" />
             </button>
-            <AskAssistantDialog />
+            
+            
+
+            {isLoggedIn ? (
+              <div className="hidden sm:flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100">
+                  <div className="h-6 w-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
+                    {username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-indigo-900">
+                    Welcome, {username}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-neutral-600 hover:text-red-600 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowLogin(true)}
+                size="sm"
+                className="hidden sm:flex bg-indigo-600 hover:bg-indigo-500 h-9"
+              >
+                Sign In
+              </Button>
+            )}
+            
             <button className="sm:hidden p-2">
               <Menu className="h-5 w-5" />
             </button>

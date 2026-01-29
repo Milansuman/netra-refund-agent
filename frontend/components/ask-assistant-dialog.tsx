@@ -12,8 +12,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Sparkles, MessageSquare, Trash2 } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Send, MessageSquare, Trash2, RotateCcw } from "lucide-react";
 
 type Message = {
   id: string;
@@ -21,170 +21,181 @@ type Message = {
   content: string;
 };
 
-const SUGGESTED_QUESTIONS = [
-  "Check my refund status",
-  "Return policy for electronics",
-  "I received a damaged item",
-];
-
 export function AskAssistantDialog() {
+  const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
-  async function sendMessage(text: string = input) {
-    if (!text.trim() || loading) return;
+  async function sendMessage() {
+    if (!input.trim() || loading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: text,
+      content: input,
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
-    // TODO: Connect to backend
-    setTimeout(() => {
+    try {
+      const response = await fetch("http://localhost:8000/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          message: input,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
+
+      const data = await response.json();
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          "I can help you with that refund request. Could you please provide your Order ID? It usually starts with 'VEL-'.",
+        content: data.response || data.message || JSON.stringify(data),
       };
+
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Sorry, I couldn't connect to the server. Please try again.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   }
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 shadow-sm flex items-center gap-2">
-          <Sparkles className="h-3 w-3" />
-          Velora Support
+        <Button
+          size="lg"
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-indigo-600 shadow-lg hover:bg-indigo-500 hover:shadow-xl transition-all duration-300 z-40"
+        >
+          <MessageSquare className="h-6 w-6 text-white" />
+          <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
-
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden border-neutral-200">
-        <div className="bg-neutral-50 px-6 py-4 border-b border-neutral-100 flex items-center gap-4">
-            <div className="relative">
-                <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                <AvatarImage src="https://images.unsplash.com/photo-1535378433864-ed9c2cb781cc?auto=format&fit=crop&w=64&q=80" />
-                <AvatarFallback className="bg-indigo-100 text-indigo-700">AI</AvatarFallback>
-                </Avatar>
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-            </div>
-          <div>
-            <DialogTitle className="text-base font-semibold text-neutral-900">Velora Support Agent</DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500">Always online • Ask about refunds & returns</DialogDescription>
+      <DialogContent className="sm:max-w-[440px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-2xl">
+        <DialogHeader className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4 flex items-center gap-4">
+          <div className="relative">
+            <Avatar className="h-10 w-10 border-2 border-white/30 shadow-sm">
+              <AvatarFallback className="bg-white text-indigo-600 font-bold">RA</AvatarFallback>
+            </Avatar>
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white"></span>
+          </div>
+          <div className="flex-1">
+            <DialogTitle className="text-base font-semibold text-white">Refund Assistant</DialogTitle>
+            <DialogDescription className="text-xs text-indigo-100">
+              Ask about returns & refunds
+            </DialogDescription>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto text-neutral-400 hover:text-red-500 hover:bg-red-50"
+            className="text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => setMessages([])}
             title="Clear Chat"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        </div>
+        </DialogHeader>
 
-        <ScrollArea className="h-[400px] w-full bg-white p-6">
-          <div ref={scrollRef} className="space-y-6">
-             {messages.length === 0 && (
-                <div className="text-center py-8">
-                    <div className="mx-auto h-12 w-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-3">
-                        <MessageSquare className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <h3 className="text-sm font-medium text-neutral-900">How can we help?</h3>
-                    <p className="text-xs text-neutral-500 mt-1 max-w-[200px] mx-auto">Track refunds, initiate returns, or get product support instantly.</p>
+        <div className="flex flex-col h-[500px] overflow-hidden">
+          <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-4">
+                <div className="h-14 w-14 rounded-full bg-indigo-50 flex items-center justify-center">
+                  <RotateCcw className="h-7 w-7 text-indigo-600" />
                 </div>
-             )}
-            
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    message.role === "user"
-                      ? "bg-indigo-600 text-white rounded-br-none"
-                      : "bg-neutral-100 text-neutral-800 rounded-bl-none"
-                  }`}
-                >
-                  <p>{message.content}</p>
+                <div className="space-y-1">
+                  <p className="font-semibold text-neutral-900">Returns & Refunds</p>
+                  <p className="text-xs text-neutral-500 max-w-[240px] mx-auto">
+                    I'll help you with returning items and processing refunds.
+                  </p>
                 </div>
               </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-none bg-neutral-100 px-4 py-3">
-                    <div className="flex gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-400 animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-400 animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-400 animate-bounce"></span>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
+                        message.role === "user"
+                          ? "bg-indigo-600 text-white rounded-br-none"
+                          : "bg-neutral-100 text-neutral-800 rounded-bl-none"
+                      }`}
+                    >
+                      {message.content}
                     </div>
-                </div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="flex justify-start">
+                    <div className="bg-neutral-100 rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                      <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                      <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce"></span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
             )}
-          </div>
-        </ScrollArea>
-
-        {/* Suggested Questions */}
-        {messages.length === 0 && (
-            <div className="px-6 pb-2">
-                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">Suggested</p>
-                <div className="flex flex-wrap gap-2">
-                    {SUGGESTED_QUESTIONS.map((q) => (
-                        <button 
-                            key={q} 
-                            onClick={() => sendMessage(q)}
-                            className="text-xs bg-neutral-50 border border-neutral-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 text-neutral-600 px-3 py-1.5 rounded-full transition-colors"
-                        >
-                            {q}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        )}
-
-        <div className="p-4 bg-white border-t border-neutral-100">
-          <div className="relative">
-            <Textarea
-                rows={1}
+          </ScrollArea>
+          <div className="p-4 border-t border-neutral-100 bg-white shrink-0">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendMessage();
+              }}
+              className="flex items-center gap-2"
+            >
+              <Textarea
+                placeholder="Type your message..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
-                className="min-h-[48px] pr-12 resize-none rounded-xl border-neutral-200 bg-neutral-50 focus:bg-white focus:ring-indigo-500/20 transition-all py-3"
+                className="flex-1 min-h-[44px] max-h-[120px] resize-none border-neutral-200 focus-visible:ring-indigo-500 py-2.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     sendMessage();
-                }
+                  }
                 }}
-            />
-            <Button 
-                onClick={() => sendMessage()} 
+              />
+              <Button
+                type="submit"
+                size="icon"
                 disabled={loading || !input.trim()}
-                className="absolute right-2 top-1.5 h-9 w-9 p-0 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white disabled:bg-neutral-200 disabled:text-neutral-400 shadow-sm"
-            >
+                className="bg-indigo-600 hover:bg-indigo-500 shrink-0 h-11 w-11"
+              >
                 <Send className="h-4 w-4" />
-                <span className="sr-only">Send</span>
-            </Button>
-          </div>
-          <div className="mt-2 text-center">
-            <p className="text-[10px] text-neutral-400">Powered by Velora Intelligence</p>
+              </Button>
+            </form>
           </div>
         </div>
       </DialogContent>
