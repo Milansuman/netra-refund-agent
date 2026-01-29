@@ -19,6 +19,9 @@ def login(username_or_email: str, password: str) -> str:
         return session_id
     else:
         raise ValueError("Invalid credentials")
+    
+def logout(session_id: str) -> None:
+    db.execute("delete from sessions where id = %s;", (session_id,))
 
 def get_session_user(session_id: str) -> User:
     users = db.execute("select users.id, users.username, users.email from users inner join sessions on sessions.user_id = users.id where sessions.id = %s;", (session_id,))
