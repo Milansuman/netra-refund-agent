@@ -76,4 +76,6 @@ def get_user_orders(user_id: int) -> list[Order]:
 
             order["order_items"].append(order_item)
 
+        orders.append(order)
+
     return orders
