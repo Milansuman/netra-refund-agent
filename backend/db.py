@@ -17,7 +17,7 @@ class Database:
         
         self.connection = psycopg.connect(DATABASE_URL)
 
-    def push(self, all: bool = False):
+    def push(self):
         migrations_path = "./migrations/*.sql"
         migration_files = sorted(glob.glob(migrations_path))
         
@@ -25,16 +25,33 @@ class Database:
             print("No migration files found")
             return
         
-        files_to_execute = migration_files if all else [migration_files[-1]]
-        
         cursor = self.connection.cursor()
         try:
-            for file_path in files_to_execute:
-                print(f"Executing migration: {file_path}")
-                with open(file_path, 'r') as f:
-                    sql = f.read()
-                    cursor.execute(sql.encode('utf-8'))
-                self.connection.commit()
+            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+            result = cursor.fetchone()
+            current_version = result[0] if result else "v0.0.0"
+            
+            def parse_version(version_str: str) -> tuple[int, int, int]:
+                parts = version_str.lstrip('v').split('.')
+                return (int(parts[0]), int(parts[1]), int(parts[2]))
+            
+            current_v = parse_version(current_version)
+            
+            for file_path in migration_files:
+                filename = os.path.basename(file_path)
+                file_version = filename.replace("migration-", "").replace(".sql", "")
+                file_v = parse_version(file_version)
+                
+                if file_v > current_v:
+                    print(f"Executing migration: {file_path}")
+                    with open(file_path, 'r') as f:
+                        sql = f.read()
+                        cursor.execute(sql.encode('utf-8'))
+                    
+                    cursor.execute("INSERT INTO schema_version (version) VALUES (%s)", (file_version,))
+                    self.connection.commit()
+                    current_v = file_v
+            
             print("Migrations executed successfully")
         except Exception as e:
             self.connection.rollback()
