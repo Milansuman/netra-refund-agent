@@ -97,3 +97,5 @@ class Database:
             raise e
         finally:
             cursor.close()
+
+db = Database()

@@ -1,10 +1,16 @@
-from db import Database
+from db import db
 from hashlib import sha256
+from typing import TypedDict
 
-def signup(db: Database, username: str, email: str, password: str):
+class User(TypedDict):
+    id: int
+    email: str
+    username: str
+
+def signup(username: str, email: str, password: str):
     db.execute("insert into users(email, password, username) values (%s,%s,%s);", (email, sha256(password.encode()).hexdigest(), username))
 
-def login(db: Database, username_or_email: str, password: str) -> str:
+def login(username_or_email: str, password: str) -> str:
     users = db.execute("select id from users where (email = %s or username = %s) and password = %s;", (username_or_email, username_or_email, sha256(password.encode()).hexdigest()))
 
     if len(users) > 0:
@@ -13,3 +19,16 @@ def login(db: Database, username_or_email: str, password: str) -> str:
         return session_id
     else:
         raise ValueError("Invalid credentials")
+
+def get_session_user(session_id: str) -> User:
+    users = db.execute("select users.id, users.username, users.email from users inner join sessions on sessions.user_id = users.id where sessions.id = %s;", (session_id,))
+
+    if len(users) > 0:
+        (user_id, username, email) = users[0]
+        return {
+            "id": user_id,
+            "email": email,
+            "username": username
+        }
+    else:
+        raise ValueError("Session does not exist")

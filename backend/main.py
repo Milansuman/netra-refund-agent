@@ -1,12 +1,30 @@
-from fastapi import FastAPI, Response, Request
-from db import Database
+from fastapi import FastAPI, Response, Request, Cookie, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from psycopg.errors import UniqueViolation
+from typing import Annotated
 
-from models import users
+from models import users, orders
 
 app = FastAPI()
-db = Database()
+
+# Dependencies
+def validate_session(response: Response, session_id: Annotated[str | None, Cookie()] = None):
+    try:
+        if not session_id:
+            raise HTTPException(403)
+        
+        return users.get_session_user(session_id=session_id)
+    except ValueError as e:
+        raise HTTPException(403, e)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 @app.get("/healthcheck")
 def healthcheck():
@@ -22,7 +40,7 @@ class SignupData(BaseModel):
 @app.post("/signup")
 def signup(data: SignupData, response: Response):
     try:
-        users.signup(db, data.username, data.email, data.password)
+        users.signup(data.username, data.email, data.password)
     except UniqueViolation:
         response.status_code = 400
         return {
@@ -36,9 +54,9 @@ class LoginData(BaseModel):
 @app.post("/login")
 def login(data: LoginData, response: Response):
     try:
-        session_id = users.login(db, data.username_or_email, data.password)
+        session_id = users.login(data.username_or_email, data.password)
         response.set_cookie(
-            key="SESSION",
+            key="session_id",
             value=session_id,
             httponly=True
         )
@@ -47,4 +65,28 @@ def login(data: LoginData, response: Response):
         response.status_code = 400
         return {
             "error": "Invalid credentials"
+        }
+    
+@app.get("/orders")
+def get_orders(response: Response, user: Annotated[users.User, Depends(validate_session)]):
+    try:
+        return {
+            "orders": orders.get_user_orders(user_id=user["id"])
+        }
+    except ValueError as e:
+        response.status_code = 400
+
+        return {
+            "error": e
+        }
+    
+@app.post("/chat")
+def chat(response: Response, user: Annotated[users.User, Depends(validate_session)]):
+    try:
+        pass
+    except ValueError as e:
+        response.status_code = 400
+
+        return {
+            "error": e
         }
