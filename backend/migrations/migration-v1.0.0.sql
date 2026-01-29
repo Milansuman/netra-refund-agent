@@ -1,5 +1,5 @@
-begin;
 create table if not exists schema_version(
+    id serial primary key,
     version text not null
 );
 
@@ -38,7 +38,8 @@ create table if not exists orders(
     paid_amount int not null,
     payment_method text not null,
     created_at timestamp default now(),
-    delivered_at timestamp
+    delivered_at timestamp,
+    user_id int not null references users(id)
 );
 
 create table if not exists order_items(
@@ -79,6 +80,3 @@ insert into refund_taxonomy(reason, description) values
     ('PAYMENT_DEBITED_BUT_FAILED', 'Payment deducted but order not processed'),
     ('SERVICE_NOT_DELIVERED', 'Service ordered was not provided or delivered'),
     ('PRICE_ADJUSTMENT', 'Refund due to price difference or overcharge');
-
-insert into schema_version values ('v1.0.0');
-commit;
