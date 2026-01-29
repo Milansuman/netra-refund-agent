@@ -1,42 +1,42 @@
-// app/page.tsx
 import Image from "next/image";
 import { AskAssistantSheet } from "@/components/ask-assistant-sheet";
 import { AskAssistantDialog } from "@/components/ask-assistant-dialog";
 import { Button } from "@/components/ui/button";
+import { ShoppingBag, Search, Menu, ArrowRight, Star } from "lucide-react";
 
-
+// Modernized Product Data
 const featuredProducts = [
   {
     id: 1,
-    name: "Echo Smart Speaker",
+    name: "Velora Smart Speaker",
     price: "₹4,999",
-    image:
-      "https://images.unsplash.com/photo-1589561253898-768105ca91a8?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1589561253898-768105ca91a8?auto=format&fit=crop&w=1600&q=90",
     badge: "Best Seller",
+    rating: 4.8,
   },
   {
     id: 2,
-    name: "Wireless Headphones",
-    price: "₹2,999",
-    image:
-      "https://images.unsplash.com/photo-1519677100203-a0e668c92439?auto=format&fit=crop&w=800&q=80",
-    badge: "Deal of the day",
+    name: "Noise Cancelling Pro",
+    price: "₹12,999",
+    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1600&q=90",
+    badge: "New Arrival",
+    rating: 4.9,
   },
   {
     id: 3,
-    name: "4K Smart TV",
+    name: "Ultra HD Smart TV",
     price: "₹29,999",
-    image:
-      "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80",
-    badge: "Top rated",
+    image: "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1600&q=90",
+    badge: "Top Rated",
+    rating: 4.7,
   },
   {
     id: 4,
-    name: "Gaming Laptop",
+    name: "Pro Gaming Laptop",
     price: "₹79,999",
-    image:
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=1600&q=90",
     badge: "Trending",
+    rating: 4.6,
   },
 ];
 
@@ -44,206 +44,222 @@ const categories = [
   {
     id: 1,
     name: "Mobiles",
-    image:
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1600&q=90",
   },
   {
     id: 2,
-    name: "Electronics",
-    image:
-      "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80",
+    name: "Audio",
+    image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1600&q=90", // Better headphone image
   },
   {
     id: 3,
     name: "Fashion",
-    image:
-      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1600&q=90",
   },
   {
     id: 4,
-    name: "Home & Kitchen",
-    image:
-      "https://images.unsplash.com/photo-1505691723518-36a5ac3be353?auto=format&fit=crop&w=800&q=80",
+    name: "Lifestyle",
+    image: "https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?auto=format&fit=crop&w=1600&q=90",
   },
 ];
 
 export default function Page() {
   return (
-    <main className="min-h-screen bg-slate-100">
-      {/* Top nav */}
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex items-center gap-6 px-4 py-3">
-          <div className="text-xl font-bold tracking-tight">
-            my<span className="text-yellow-400">Shop</span>
-          </div>
-
-          <div className="hidden flex-1 items-center gap-2 rounded-md bg-white px-3 py-2 text-sm text-slate-900 md:flex">
-            <input
-              type="text"
-              placeholder="Search for products, brands and more"
-              className="w-full bg-transparent outline-none"
-            />
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 rounded-md bg-yellow-400 p-0 hover:bg-yellow-300 border-none"
-              aria-label="Search"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </Button>
-
-            <AskAssistantDialog />
-          </div>
-
-          <nav className="ml-auto flex items-center gap-4 text-sm">
-            <button className="hover:underline">Hello, sign in</button>
-            <button className="hover:underline">Orders</button>
-            <button className="relative">
-              Cart
-              <span className="absolute -right-3 -top-2 rounded-full bg-yellow-400 px-1 text-[10px] font-bold text-slate-900">
-                0
-              </span>
-            </button>
-          </nav>
-        </div>
-      </header>
-
-
-      {/* Secondary nav */}
-      <div className="bg-slate-800 text-xs text-slate-100">
-        <div className="mx-auto flex items-center gap-4 px-4 py-2 overflow-x-auto">
-          <button className="whitespace-nowrap hover:underline">All</button>
-          <button className="whitespace-nowrap hover:underline">Best Sellers</button>
-          <button className="whitespace-nowrap hover:underline">Mobiles</button>
-          <button className="whitespace-nowrap hover:underline">Fashion</button>
-          <button className="whitespace-nowrap hover:underline">Electronics</button>
-          <button className="whitespace-nowrap hover:underline">Home</button>
-          <button className="whitespace-nowrap hover:underline">
-            Customer Service
-          </button>
-        </div>
-      </div>
-
-      {/* Hero banner */}
-      <section className="bg-gradient-to-r from-slate-900 to-slate-700">
-        <div className="mx-auto flex  flex-col gap-6 px-4 py-10 md:flex-row">
-          <div className="flex-1 text-white">
-            <p className="text-xs uppercase tracking-wide text-slate-300">
-              Deals inspired by Amazon
-            </p>
-            <h1 className="mt-2 text-3xl font-bold md:text-4xl">
-              Great deals on everything you need.
-            </h1>
-            <p className="mt-3 text-sm text-slate-200">
-              Shop top picks across electronics, fashion, home and more with fast
-              delivery and easy returns.
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button className="rounded-md bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-yellow-300">
-                Shop now
-              </button>
-              <button className="rounded-md border border-slate-400 px-4 py-2 text-sm text-slate-100 hover:bg-slate-800">
-                View deals
-              </button>
+    <main className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-8">
+            <a href="#" className="text-2xl font-bold tracking-tighter text-indigo-600">
+              Velora.
+            </a>
+            <div className="hidden md:flex gap-6 text-sm font-medium text-neutral-600">
+              <a href="#" className="hover:text-indigo-600 transition-colors">New Arrivals</a>
+              <a href="#" className="hover:text-indigo-600 transition-colors">Electronics</a>
+              <a href="#" className="hover:text-indigo-600 transition-colors">Fashion</a>
+              <a href="#" className="hover:text-indigo-600 transition-colors">Deals</a>
             </div>
           </div>
 
-          <div className="relative h-48 flex-1 md:h-60">
-            <div className="absolute inset-0 rounded-lg bg-slate-600/40" />
+          <div className="flex items-center gap-4">
+             <div className="relative hidden sm:block">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Search premium products..."
+                className="h-9 w-64 rounded-full bg-neutral-100 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              />
+            </div>
+            
+            <button className="relative p-2 text-neutral-600 hover:text-indigo-600 transition-colors">
+              <ShoppingBag className="h-5 w-5" />
+              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                0
+              </span>
+            </button>
+            <AskAssistantDialog />
+            <button className="sm:hidden p-2">
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-neutral-900 text-white">
+        <div className="absolute inset-0 opacity-20">
             <Image
-              src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80"
-              alt="Hero banner"
-              fill
-              className="rounded-lg object-cover"
+                src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1920&q=80"
+                alt="Background"
+                fill
+                className="object-cover"
             />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/40 to-transparent" />
+        
+        <div className="relative mx-auto flex flex-col items-start justify-center gap-6 px-4 py-24 sm:px-6 lg:px-8 lg:py-40">
+          <span className="inline-block rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-400 backdrop-blur-sm border border-indigo-500/20">
+            Spring Collection 2026
+          </span>
+          <h1 className="max-w-2xl text-5xl font-bold tracking-tight sm:text-7xl">
+            Redefine Your <span className="text-indigo-400">Style.</span>
+          </h1>
+          <p className="max-w-xl text-lg text-neutral-300">
+            Discover a curated collection of premium electronics, fashion, and lifestyle products designed for the modern minimalists.
+          </p>
+          <div className="mt-4 flex gap-4">
+            <Button size="lg" className="bg-white text-neutral-900 hover:bg-neutral-200">
+              Shop Now
+            </Button>
+             <Button size="lg" variant="outline" className="border-neutral-700 text-black hover:bg-neutral-800 hover:text-white">
+              View Lookbook
+            </Button>
           </div>
         </div>
       </section>
 
       {/* Categories */}
-      <section className="-mt-10 bg-slate-100 pb-10">
-        <div className="mx-auto grid  gap-4 px-4 md:grid-cols-4">
-          {categories.map((category) => (
-            <div
-              key={category.id}
-              className="rounded-md bg-white p-3 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <h2 className="mb-2 text-sm font-semibold">{category.name}</h2>
-              <div className="relative h-32 w-full">
+      <section className="py-16 sm:py-24">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
+           <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Shop by Category</h2>
+             <a href="#" className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-500">
+              Browse all categories <ArrowRight className="ml-1 h-4 w-4" />
+            </a>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-8 xl:gap-10">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="group relative aspect-[4/5] overflow-hidden rounded-xl bg-neutral-100"
+              >
                 <Image
                   src={category.image}
                   alt={category.name}
                   fill
-                  className="rounded-md object-cover"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 left-4">
+                  <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                </div>
               </div>
-              <button className="mt-3 text-xs font-semibold text-sky-700 hover:underline">
-                Shop now
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Featured products */}
-      <section className="bg-slate-100 pb-12">
-        <div className="mx-auto  px-4">
-          <h2 className="mb-4 text-lg font-semibold">Featured products</h2>
+      {/* Featured Products */}
+      <section className="bg-white py-16 sm:py-24">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-8">
+             <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Trending Now</h2>
+              <div className="flex gap-2">
+                 {/* Filter buttons could go here */}
+              </div>
+          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-10">
             {featuredProducts.map((product) => (
-              <article
-                key={product.id}
-                className="flex flex-col rounded-md bg-white p-3 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="relative mb-3 h-40 w-full">
+              <div key={product.id} className="group relative">
+                <div className="aspect-square w-full overflow-hidden rounded-xl bg-neutral-100 relative">
                   <Image
                     src={product.image}
                     alt={product.name}
                     fill
-                    className="object-contain"
+                    className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
                   />
+                  <div className="absolute top-2 left-2">
+                     <span className="inline-flex items-center rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-neutral-700 backdrop-blur-sm shadow-sm">
+                      {product.badge}
+                    </span>
+                  </div>
                 </div>
-
-                <p className="text-xs text-emerald-700 font-semibold">
-                  {product.badge}
-                </p>
-                <h3 className="mt-1 line-clamp-2 text-sm font-medium">
-                  {product.name}
-                </h3>
-                <p className="mt-1 text-sm font-semibold">{product.price}</p>
-
-                <button className="mt-3 rounded-md bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-yellow-300">
-                  Add to cart
+                <div className="mt-4 flex justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-900">
+                      <a href="#">
+                        <span aria-hidden="true" className="absolute inset-0" />
+                        {product.name}
+                      </a>
+                    </h3>
+                    <p className="mt-1 text-sm text-neutral-500 flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" /> {product.rating}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-indigo-600">{product.price}</p>
+                </div>
+                <button className="mt-4 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-4 left-4 right-4 translate-y-2 group-hover:translate-y-0">
+                    Add to Cart
                 </button>
-              </article>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-slate-900 py-6 text-xs text-slate-300">
-        <div className="mx-auto flex  flex-wrap items-center justify-between gap-3 px-4">
-          <p>© {new Date().getFullYear()} myShop. Inspired by Amazon.</p>
-          <div className="flex gap-4">
-            <button className="hover:underline">Privacy</button>
-            <button className="hover:underline">Terms</button>
-            <button className="hover:underline">Help</button>
+      <footer className="border-t border-neutral-200 bg-white pt-16 pb-8">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+             <div className="col-span-2 md:col-span-1">
+                <span className="text-xl font-bold text-indigo-600">Velora.</span>
+                <p className="mt-4 text-sm text-neutral-500">
+                    Premium products for a premium lifestyle. Quality you can trust, designs you will love.
+                </p>
+             </div>
+             <div>
+                <h3 className="text-sm font-semibold text-neutral-900">Shop</h3>
+                <ul className="mt-4 space-y-2 text-sm text-neutral-600">
+                    <li><a href="#" className="hover:text-indigo-600">New Arrivals</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Electronics</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Fashion</a></li>
+                </ul>
+             </div>
+             <div>
+                <h3 className="text-sm font-semibold text-neutral-900">Support</h3>
+                <ul className="mt-4 space-y-2 text-sm text-neutral-600">
+                    <li><a href="#" className="hover:text-indigo-600">Help Center</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Order Status</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Returns</a></li>
+                </ul>
+             </div>
+             <div>
+                <h3 className="text-sm font-semibold text-neutral-900">Company</h3>
+                <ul className="mt-4 space-y-2 text-sm text-neutral-600">
+                    <li><a href="#" className="hover:text-indigo-600">About</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Press</a></li>
+                    <li><a href="#" className="hover:text-indigo-600">Careers</a></li>
+                </ul>
+             </div>
+          </div>
+          <div className="mt-12 border-t border-neutral-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-neutral-400">© {new Date().getFullYear()} Velora Inc. All rights reserved.</p>
+            <div className="flex gap-6 text-xs text-neutral-400">
+               <a href="#" className="hover:text-neutral-600">Privacy Policy</a>
+               <a href="#" className="hover:text-neutral-600">Terms of Service</a>
+            </div>
           </div>
         </div>
       </footer>
