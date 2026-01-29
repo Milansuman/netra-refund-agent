@@ -44,7 +44,7 @@ def signup(data: SignupData, response: Response):
     except UniqueViolation:
         response.status_code = 400
         return {
-            "error": "User already exists"
+            "detail": "User already exists"
         }
 
 class LoginData(BaseModel):
@@ -64,8 +64,20 @@ def login(data: LoginData, response: Response):
     except ValueError:
         response.status_code = 400
         return {
-            "error": "Invalid credentials"
+            "detail": "Invalid credentials"
         }
+    
+@app.post("/logout")
+def logout(response: Response, session_id: Annotated[str | None, Cookie()] = None):
+    if not session_id:
+        raise HTTPException(403)
+
+    users.logout(session_id)
+    response.delete_cookie("session_id")
+
+@app.get("/me")
+def me(user: Annotated[users.User, Depends(validate_session)]):
+    return user
     
 @app.get("/orders")
 def get_orders(response: Response, user: Annotated[users.User, Depends(validate_session)]):
@@ -77,7 +89,7 @@ def get_orders(response: Response, user: Annotated[users.User, Depends(validate_
         response.status_code = 400
 
         return {
-            "error": e
+            "detail": e
         }
     
 @app.post("/chat")
@@ -88,5 +100,5 @@ def chat(response: Response, user: Annotated[users.User, Depends(validate_sessio
         response.status_code = 400
 
         return {
-            "error": e
+            "detail": e
         }
