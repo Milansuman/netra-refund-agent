@@ -27,9 +27,13 @@ class Database:
         
         cursor = self.connection.cursor()
         try:
-            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
-            result = cursor.fetchone()
-            current_version = result[0] if result else "v0.0.0"
+            try:
+                cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+                result = cursor.fetchone()
+                current_version = result[0] if result else "v0.0.0"
+            except psycopg.errors.UndefinedTable:
+                current_version = "v0.0.0"
+                self.connection.rollback() # Ensure the connection in't poisoned
             
             def parse_version(version_str: str) -> tuple[int, int, int]:
                 parts = version_str.lstrip('v').split('.')
