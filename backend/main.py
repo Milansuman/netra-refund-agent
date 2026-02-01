@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Response, Request, Cookie, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from psycopg.errors import UniqueViolation
 from typing import Annotated
+from datetime import datetime
+import uuid
 
 from models import users, orders
+from agent import invoke_graph
 
 app = FastAPI()
 
@@ -92,11 +96,25 @@ def get_orders(response: Response, user: Annotated[users.User, Depends(validate_
             "detail": e
         }
     
+class ChatRequest(BaseModel):
+    order_item_ids: list[str] | None
+    new_chat: bool = False
+    prompt: str | None = None
+
 @app.post("/chat")
-def chat(response: Response, user: Annotated[users.User, Depends(validate_session)]):
+def chat(chat: ChatRequest, response: Response, user: Annotated[users.User, Depends(validate_session)], thread_id: Annotated[str | None, Cookie()] = None):
     try:
-        pass
+        if chat.new_chat or not thread_id:
+            thread_id = str(uuid.uuid4())
+            response.set_cookie(
+                key="thread_id",
+                value=thread_id,
+                httponly=True
+            )
+
+        return StreamingResponse(invoke_graph(chat.order_item_ids, thread_id, chat.prompt, chat.new_chat), media_type="application/x-ndjson") # type: ignore
     except ValueError as e:
+        print(e)
         response.status_code = 400
 
         return {

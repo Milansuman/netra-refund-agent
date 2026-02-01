@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 import glob
 from typing import LiteralString, Optional, Union, Sequence, Mapping, Any, Iterable
+from langgraph.checkpoint.postgres import PostgresSaver
 
 load_dotenv()
 
@@ -16,6 +17,13 @@ class Database:
             raise ValueError("DATABASE_URL not found")
         
         self.connection = psycopg.connect(DATABASE_URL)
+        self.checkpointer = PostgresSaver(self.connection) #type: ignore
+
+    def setup_checkpointer(self):
+        self.connection.rollback()
+        self.connection.autocommit = True
+        self.checkpointer.setup()
+        self.connection.autocommit = False
 
     def push(self):
         migrations_path = "./migrations/*.sql"

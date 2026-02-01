@@ -6,6 +6,7 @@ class User(TypedDict):
     id: int
     email: str
     username: str
+    session_id: str
 
 def signup(username: str, email: str, password: str):
     db.execute("insert into users(email, password, username) values (%s,%s,%s);", (email, sha256(password.encode()).hexdigest(), username))
@@ -31,7 +32,8 @@ def get_session_user(session_id: str) -> User:
         return {
             "id": user_id,
             "email": email,
-            "username": username
+            "username": username,
+            "session_id": session_id
         }
     else:
         raise ValueError("Session does not exist")
