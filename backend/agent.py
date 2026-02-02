@@ -161,6 +161,92 @@ def create_get_orders_tool(user_id: int):
     return get_user_orders
 
 
+def create_get_order_details_tool(user_id: int):
+    """
+    Create a tool that fetches details of a specific order.
+
+    WHY do we need user_id?
+    -----------------------
+    For SECURITY! We verify the order belongs to the current user.
+    Otherwise, a user could request details of someone else's order.
+    """
+
+    @tool
+    def get_order_details(order_id: int) -> str:
+        """
+        Get detailed information about a specific order including all products.
+        Use this when the user asks about a specific order by ID, like
+        "show me order #1" or "what's in order 2".
+
+        Args:
+            order_id: The order ID to look up (e.g., 1, 2, 3)
+        """
+        try:
+            # Fetch all orders for this user
+            user_orders = orders.get_user_orders(user_id)
+
+            # Find the specific order (and verify it belongs to this user!)
+            target_order = None
+            for order in user_orders:
+                if order["id"] == order_id:
+                    target_order = order
+                    break
+
+            if not target_order:
+                return f"Order #{order_id} not found. Please check the order number and try again."
+
+            # Create structured data for frontend to render as product cards
+            # Using <!--PRODUCT_DATA:...--> marker (similar to ORDER_DATA)
+            products_data = {
+                "order_id": target_order["id"],
+                "status": target_order["status"],
+                "payment_method": target_order["payment_method"],
+                "total_paid": target_order["paid_amount"] / 100,
+                "items": [],
+            }
+
+            for item in target_order["order_items"]:
+                product = item["product"]
+                item_data = {
+                    "id": item["id"],
+                    "name": product["title"],
+                    "description": product["description"] or "N/A",
+                    "quantity": item["quantity"],
+                    "unit_price": item["unit_price"] / 100,
+                    "tax_percent": item["tax_percent"],
+                    "discounts": [],
+                }
+
+                # Add discount info
+                for discount in item.get("discounts", []):
+                    if discount.get("percent"):
+                        item_data["discounts"].append(
+                            f"{discount['code']} ({discount['percent']}% off)"
+                        )
+                    elif discount.get("amount"):
+                        item_data["discounts"].append(
+                            f"{discount['code']} (${discount['amount']/100:.2f} off)"
+                        )
+
+                products_data["items"].append(item_data)
+
+            # Return structured data for frontend AND text for LLM
+            result = f"<!--PRODUCT_DATA:{json.dumps(products_data)}-->\n\n"
+            result += f"**Order #{target_order['id']}** - {target_order['status']}\n"
+            result += f"Total: ${target_order['paid_amount']/100:.2f}\n\n"
+            result += "Products:\n"
+            for item in target_order["order_items"]:
+                result += f"• {item['product']['title']} (Item ID: {item['id']}) - ${item['unit_price']/100:.2f} x{item['quantity']}\n"
+
+            result += "\nWould you like to request a refund for any of these items?"
+            return result
+
+        except Exception as e:
+            return f"Sorry, I couldn't fetch order details: {str(e)}"
+
+    return get_order_details
+
+
 # =============================================================================
 # SYSTEM PROMPT
 # =============================================================================
@@ -174,9 +260,14 @@ class _RefundClassification(BaseModel):
 SYSTEM_PROMPT = """You are a refund agent that helps users with their orders and refunds.
 
 IMPORTANT TOOL USAGE RULES:
-- When user mentions "orders", "my orders", "list orders", "show orders", or similar: YOU MUST call the get_user_orders tool. Do NOT make up order information.
-- ALWAYS call the tool first before responding about orders.
-- The tool will return real order data that you should present to the user.
+1. When user mentions "orders", "my orders", "list orders", "show orders": 
+   → Call get_user_orders to fetch all orders
+
+2. When user asks about a SPECIFIC order by number like "order 1", "order #4", "products in order 2":
+   → Call get_order_details with the order_id
+
+3. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+4. The tools will return real data that you should present to the user.
 
 For refund requests, categorize complaints into types. Ask questions until you're sure, then respond with ONLY this JSON:
 
@@ -226,7 +317,8 @@ def chat_node(state: RefundAgentState) -> dict:
 
     # Create tools with the user's ID
     get_orders_tool = create_get_orders_tool(user_id)
-    tools = [get_orders_tool]
+    get_order_details_tool = create_get_order_details_tool(user_id)
+    tools = [get_orders_tool, get_order_details_tool]
 
     # Bind tools to the LLM with explicit tool configuration
     # tool_choice="auto" lets the LLM decide, but with clear instructions
@@ -289,9 +381,13 @@ def tools_node(state: RefundAgentState) -> dict:
     user_id = state.get("user_id")
     last_message = messages[-1]
 
-    # Create the tool with user context
+    # Create the tools with user context
     get_orders_tool = create_get_orders_tool(user_id)
-    tools_by_name = {"get_user_orders": get_orders_tool}
+    get_order_details_tool = create_get_order_details_tool(user_id)
+    tools_by_name = {
+        "get_user_orders": get_orders_tool,
+        "get_order_details": get_order_details_tool,
+    }
 
     tool_messages = []
     for tool_call in last_message.tool_calls:
