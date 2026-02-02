@@ -1,8 +1,7 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.types import Command, interrupt
-from langchain.messages import AnyMessage, HumanMessage, SystemMessage
+from langchain.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_groq import ChatGroq
-from typing import TypedDict, Literal
+from typing import TypedDict
 from dotenv import load_dotenv
 import os
 from models import refunds
@@ -16,22 +15,23 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not set")
 
+
 class RefundAgentState(TypedDict):
     order_item_ids: list[str]
     messages: list[AnyMessage]
     refund: dict | None
+    is_complete: bool
 
-_llm = ChatGroq(
-    api_key=GROQ_API_KEY, #type: ignore
-    model="llama-3.3-70b-versatile"
-)
+
+_llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.3-70b-versatile")  # type: ignore
+
 
 class _RefundClassification(BaseModel):
     refund_type: str
     reason: str
 
-# SYSTEM PROMPT
 
+# SYSTEM PROMPT
 SYSTEM_PROMPT = """You are a refund agent that listens to the users complaints and categorizes it into one of the given refund categories. Ask questions to the user until you're sure of which refund type to classify the complaint as. Respond normally to the user until you've figured out the refund type, at which point respond with the following schema:
 
 {
@@ -46,85 +46,100 @@ GUIDELINES:
 - Return JSON of the given schema when you figure out the refund type
 - Do not add text before or after the JSON when you find the refund type
 
-REFUND CATEGORIES:\n
+REFUND CATEGORIES:
 """
 
-SYSTEM_PROMPT += "\n".join([f"{refund["title"]} - {refund["description"]}" for refund in refunds.get_refund_taxonomy()])
+SYSTEM_PROMPT += "\n".join(
+    [
+        f"{refund['title']} - {refund['description']}"
+        for refund in refunds.get_refund_taxonomy()
+    ]
+)
 
 SYSTEM_PROMPT += "\nOther - Refund reason does not fit in any other category\n"
 
-# SYSTEM PROMPT
 
+def chat_node(state: RefundAgentState) -> dict:
+    """Process the conversation and generate a response."""
+    messages = state.get("messages", [])
 
-def collect_complaint_node(state: RefundAgentState) -> dict:
-    messages = state["messages"]
+    # Ensure system message is first
+    if not messages or not isinstance(messages[0], SystemMessage):
+        messages.insert(0, SystemMessage(content=SYSTEM_PROMPT))
 
-    user_prompt = interrupt(messages[-1].content)
-    messages.append(HumanMessage(
-        content=user_prompt
-    ))
-
+    # Get LLM response
     response = _llm.invoke(messages)
     messages.append(response)
 
-    return {
-        "messages": messages
-    }
-
-def should_continue_complaint_conversation(state: RefundAgentState) -> Command[Literal["collect_complaint_node", "output_messages"]]:
-    messages = state["messages"]
-
+    # Check if this is a refund classification (JSON response)
+    refund = None
+    is_complete = False
     try:
-        refund = json.loads(str(messages[-1].content))
+        refund = json.loads(str(response.content))
         _RefundClassification(**refund)
-        return Command(
-            goto="output_messages",
-            update={
-                "refund": refund
-            }
-        )
+        is_complete = True
     except:
-        return Command(
-            goto="collect_complaint_node"
-        )
-    
-def output_messages_node(state: RefundAgentState) -> None:
-    print(state["messages"])
+        pass
 
+    return {"messages": messages, "refund": refund, "is_complete": is_complete}
+
+
+# Build the graph - simple single-node design
 _builder = StateGraph(RefundAgentState)
-_builder.add_node("should_continue_complain_conversation", should_continue_complaint_conversation)
-_builder.add_node("collect_complaint_node", collect_complaint_node)
-_builder.add_node("output_messages", output_messages_node)
-
-_builder.add_edge(START, "collect_complaint_node")
-_builder.add_edge("collect_complaint_node", "should_continue_complain_conversation")
-_builder.add_edge("output_messages", END)
+_builder.add_node("chat", chat_node)
+_builder.add_edge(START, "chat")
+_builder.add_edge("chat", END)
 
 graph = _builder.compile(checkpointer=db.checkpointer)
 
-def invoke_graph(order_item_ids: list[str] | None, thread_id: str, prompt: str | None, new_chat: bool = False):
-    if new_chat:
-        if not order_item_ids:
-            raise ValueError("Order item ids can't be None in a new chat")
 
-        messages: list[AnyMessage] = [
-            SystemMessage(content=SYSTEM_PROMPT)
-        ]
-        for chunk in graph.stream({
+def invoke_graph(
+    thread_id: str,
+    prompt: str,
+    order_item_ids: list[str] | None = None,
+):
+    """
+    Invoke the refund agent with a user message.
+
+    This is a simpler design that:
+    1. Loads the existing conversation from the checkpoint
+    2. Adds the new user message
+    3. Generates a response
+    4. Saves the updated state to the checkpoint
+    """
+    if not order_item_ids:
+        order_item_ids = []
+
+    # Get existing state from checkpoint (if any)
+    config = {"configurable": {"thread_id": thread_id}}
+
+    try:
+        state_snapshot = graph.get_state(config)
+        existing_messages = (
+            state_snapshot.values.get("messages", []) if state_snapshot.values else []
+        )
+    except:
+        existing_messages = []
+
+    # Add system message if it's a new conversation
+    if not existing_messages:
+        existing_messages = [SystemMessage(content=SYSTEM_PROMPT)]
+
+    # Add the new user message
+    existing_messages.append(HumanMessage(content=prompt))
+
+    # Run the graph
+    for chunk in graph.stream(
+        {
             "order_item_ids": order_item_ids,
-            "messages": messages,
-            "refund": None
-        }, config={
-            "configurable": {
-                "thread_id": thread_id
-            }
-        }, stream_mode=["messages"]):
-            print(chunk)
-            yield chunk
-    else:
-        for chunk in graph.stream(Command(resume=prompt), config={
-            "configurable": {
-                "thread_id": thread_id
-            }
-        }, stream_mode=["messages"]):
-            yield chunk
+            "messages": existing_messages,
+            "refund": None,
+            "is_complete": False,
+        },
+        config=config,
+        stream_mode="updates",
+    ):
+        json_chunk = json.dumps(
+            chunk, default=lambda o: o.dict() if hasattr(o, "dict") else str(o)
+        )
+        yield json_chunk + "\n"

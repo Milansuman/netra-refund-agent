@@ -94,11 +94,11 @@ export function AskAssistantDialog() {
           <div className="relative">
             <MessageSquare className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
             <span className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-400 rounded-full animate-pulse ring-2 ring-white"></span>
-          </div>
+          </div><div className=""></div>
           <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[420px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl">
+      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl">
         {/* Header with glassmorphism */}
         <DialogHeader className="relative overflow-hidden px-5 py-4 flex items-center gap-4">
           <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"></div>
@@ -121,7 +121,7 @@ export function AskAssistantDialog() {
               </DialogDescription>
             </div>
           </div>
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             className="relative text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
@@ -129,7 +129,7 @@ export function AskAssistantDialog() {
             title="Clear Chat"
           >
             <Trash2 className="h-4 w-4" />
-          </Button>
+          </Button> */}
         </DialogHeader>
 
         <div className="flex flex-col h-[480px] overflow-hidden bg-gradient-to-b from-neutral-50 to-white">
@@ -233,6 +233,18 @@ export function AskAssistantDialog() {
                   }}
                 />
               </div>
+              {messages.length > 0 && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setMessages([])}
+                  className="h-12 w-12 rounded-2xl border-neutral-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                  title="Clear chat"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              )}
               <Button
                 type="submit"
                 size="icon"

@@ -6,40 +6,64 @@ from psycopg.errors import UniqueViolation
 from typing import Annotated
 from datetime import datetime
 import uuid
+import json
 
 from models import users, orders
 from agent import invoke_graph
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+from db import db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Setup the database tables for the checkpointer
+    try:
+        db.setup_checkpointer()
+        db.push()
+        print("INFO: Database initialized (Checkpointer + Migrations)")
+    except Exception as e:
+        print(f"WARNING: Could not setup checkpointer: {e}")
+    yield
+    # Shutdown logic (if any) can go here
+    db.close()
+
+
+app = FastAPI(lifespan=lifespan)
+
 
 # Dependencies
-def validate_session(response: Response, session_id: Annotated[str | None, Cookie()] = None):
+def validate_session(
+    response: Response, session_id: Annotated[str | None, Cookie()] = None
+):
     try:
         if not session_id:
             raise HTTPException(403)
-        
+
         return users.get_session_user(session_id=session_id)
     except ValueError as e:
         raise HTTPException(403, e)
+
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
+
 
 @app.get("/healthcheck")
 def healthcheck():
-    return {
-        "status": "all systems operational"
-    }
+    return {"status": "all systems operational"}
+
 
 class SignupData(BaseModel):
     username: str
     email: str
     password: str
+
 
 @app.post("/signup")
 def signup(data: SignupData, response: Response):
@@ -47,30 +71,25 @@ def signup(data: SignupData, response: Response):
         users.signup(data.username, data.email, data.password)
     except UniqueViolation:
         response.status_code = 400
-        return {
-            "detail": "User already exists"
-        }
+        return {"detail": "User already exists"}
+
 
 class LoginData(BaseModel):
     username_or_email: str
     password: str
 
+
 @app.post("/login")
 def login(data: LoginData, response: Response):
     try:
         session_id = users.login(data.username_or_email, data.password)
-        response.set_cookie(
-            key="session_id",
-            value=session_id,
-            httponly=True
-        )
+        response.set_cookie(key="session_id", value=session_id, httponly=True)
         return session_id
     except ValueError:
         response.status_code = 400
-        return {
-            "detail": "Invalid credentials"
-        }
-    
+        return {"detail": "Invalid credentials"}
+
+
 @app.post("/logout")
 def logout(response: Response, session_id: Annotated[str | None, Cookie()] = None):
     if not session_id:
@@ -79,44 +98,49 @@ def logout(response: Response, session_id: Annotated[str | None, Cookie()] = Non
     users.logout(session_id)
     response.delete_cookie("session_id")
 
+
 @app.get("/me")
 def me(user: Annotated[users.User, Depends(validate_session)]):
     return user
-    
+
+
 @app.get("/orders")
-def get_orders(response: Response, user: Annotated[users.User, Depends(validate_session)]):
+def get_orders(
+    response: Response, user: Annotated[users.User, Depends(validate_session)]
+):
     try:
-        return {
-            "orders": orders.get_user_orders(user_id=user["id"])
-        }
+        return {"orders": orders.get_user_orders(user_id=user["id"])}
     except ValueError as e:
         response.status_code = 400
 
-        return {
-            "detail": e
-        }
-    
+        return {"detail": e}
+
+
 class ChatRequest(BaseModel):
-    order_item_ids: list[str] | None
-    new_chat: bool = False
-    prompt: str | None = None
+    prompt: str
+    thread_id: str | None = None  # Frontend manages this now
+    order_item_ids: list[str] | None = None
+
 
 @app.post("/chat")
-def chat(chat: ChatRequest, response: Response, user: Annotated[users.User, Depends(validate_session)], thread_id: Annotated[str | None, Cookie()] = None):
+def chat(
+    chat: ChatRequest,
+    response: Response,
+    user: Annotated[users.User, Depends(validate_session)],
+):
     try:
-        if chat.new_chat or not thread_id:
-            thread_id = str(uuid.uuid4())
-            response.set_cookie(
-                key="thread_id",
-                value=thread_id,
-                httponly=True
-            )
+        # Generate new thread_id if not provided
+        thread_id = chat.thread_id or str(uuid.uuid4())
 
-        return StreamingResponse(invoke_graph(chat.order_item_ids, thread_id, chat.prompt, chat.new_chat), media_type="application/x-ndjson") # type: ignore
+        def generate():
+            # First, yield the thread_id so frontend can track it
+            yield json.dumps({"thread_id": thread_id}) + "\n"
+            # Then yield the agent response chunks
+            for chunk in invoke_graph(thread_id, chat.prompt, chat.order_item_ids):
+                yield chunk
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
     except ValueError as e:
         print(e)
         response.status_code = 400
-
-        return {
-            "detail": e
-        }
+        return {"detail": str(e)}
