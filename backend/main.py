@@ -128,15 +128,31 @@ def chat(
     response: Response,
     user: Annotated[users.User, Depends(validate_session)],
 ):
+    """
+    Chat endpoint that connects the frontend to the refund agent.
+
+    The 'user' parameter comes from validate_session which:
+    1. Reads the session_id cookie
+    2. Looks up the user in the database
+    3. Returns the user dict with 'id', 'username', 'email'
+
+    We pass user['id'] to the agent so tools can fetch user-specific data.
+    """
     try:
         # Generate new thread_id if not provided
         thread_id = chat.thread_id or str(uuid.uuid4())
+
+        # Get the user's ID from the session
+        user_id = user["id"]
 
         def generate():
             # First, yield the thread_id so frontend can track it
             yield json.dumps({"thread_id": thread_id}) + "\n"
             # Then yield the agent response chunks
-            for chunk in invoke_graph(thread_id, chat.prompt, chat.order_item_ids):
+            # Note: We pass user_id so the agent can fetch their orders
+            for chunk in invoke_graph(
+                thread_id, chat.prompt, user_id, chat.order_item_ids
+            ):
                 yield chunk
 
         return StreamingResponse(generate(), media_type="application/x-ndjson")

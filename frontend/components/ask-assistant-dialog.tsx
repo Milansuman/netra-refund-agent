@@ -12,26 +12,159 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, MessageSquare, Trash2, Sparkles, Bot } from "lucide-react";
+import { Send, MessageSquare, Trash2, Sparkles, Bot, Package, CreditCard, ShoppingBag } from "lucide-react";
+
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
+// 
+// These TypeScript types define the shape of our data.
+// Think of them as "contracts" - if data doesn't match, TypeScript warns us.
+// =============================================================================
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  orders?: Order[];  // NEW: Optional array of orders to display as cards
 };
+
+// Order data structure (matches what the backend sends)
+type OrderItem = {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+};
+
+type Order = {
+  id: number;
+  status: string;
+  paid_amount: number;
+  payment_method: string;
+  items: OrderItem[];
+};
+
+// =============================================================================
+// HELPER FUNCTION: Parse Order Data from Message
+// =============================================================================
+// 
+// The backend sends order data in a special format:
+// <!--ORDER_DATA:[{...}, {...}]-->
+// 
+// This function extracts that JSON and returns:
+// 1. The order data (for rendering cards)
+// 2. The clean message (without the marker)
+// =============================================================================
+
+function parseOrderData(content: string): { orders: Order[] | null; cleanContent: string } {
+  // Using [\s\S]*? instead of .*? with /s flag for older JS compatibility
+  // [\s\S] matches any character including newlines
+  const orderDataRegex = /<!--ORDER_DATA:([\s\S]*?)-->/;
+  const match = content.match(orderDataRegex);
+  
+  if (match) {
+    try {
+      const orders = JSON.parse(match[1]) as Order[];
+      // Remove the ORDER_DATA marker from the content
+      const cleanContent = content.replace(orderDataRegex, "").trim();
+      return { orders, cleanContent };
+    } catch {
+      return { orders: null, cleanContent: content };
+    }
+  }
+  
+  return { orders: null, cleanContent: content };
+}
+
+// =============================================================================
+// ORDER CARD COMPONENT
+// =============================================================================
+// 
+// This component renders a single order as a beautiful card.
+// It receives an Order object and displays it with nice styling.
+// =============================================================================
+
+function OrderCard({ order }: { order: Order }) {
+  // Status color mapping
+  const statusColors: Record<string, string> = {
+    pending: "bg-yellow-100 text-yellow-800",
+    completed: "bg-green-100 text-green-800",
+    shipped: "bg-blue-100 text-blue-800",
+    cancelled: "bg-red-100 text-red-800",
+    delivered: "bg-emerald-100 text-emerald-800",
+  };
+  
+  const statusClass = statusColors[order.status.toLowerCase()] || "bg-gray-100 text-gray-800";
+  
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+      {/* Card Header */}
+      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-3 border-b border-neutral-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-indigo-600" />
+            <span className="font-semibold text-neutral-900">Order #{order.id}</span>
+          </div>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass}`}>
+            {order.status}
+          </span>
+        </div>
+      </div>
+      
+      {/* Card Body - Items List */}
+      <div className="p-4 space-y-2">
+        {order.items.map((item) => (
+          <div key={item.id} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-3.5 w-3.5 text-neutral-400" />
+              <span className="text-neutral-700">{item.name}</span>
+              <span className="text-neutral-400">×{item.quantity}</span>
+            </div>
+            <span className="text-neutral-600">${item.price.toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Card Footer */}
+      <div className="bg-neutral-50 px-4 py-3 border-t border-neutral-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            <CreditCard className="h-3.5 w-3.5" />
+            <span>{order.payment_method}</span>
+          </div>
+          <span className="font-semibold text-indigo-600">${order.paid_amount.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 export function AskAssistantDialog() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Clear thread when dialog closes
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setMessages([]);
+      setThreadId(null);
+    }
+  };
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -43,6 +176,7 @@ export function AskAssistantDialog() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setLoading(true);
 
@@ -54,7 +188,9 @@ export function AskAssistantDialog() {
         },
         credentials: "include",
         body: JSON.stringify({
-          message: input,
+          prompt: currentInput,
+          thread_id: threadId,
+          order_item_ids: []
         }),
       });
 
@@ -62,15 +198,84 @@ export function AskAssistantDialog() {
         throw new Error("Failed to send message");
       }
 
-      const data = await response.json();
+      if (!response.body) return;
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.response || data.message || JSON.stringify(data),
-      };
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      const assistantMessageId = (Date.now() + 1).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          content: "",
+        },
+      ]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      let done = false;
+      
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        
+        if (value) {
+          const chunkValue = decoder.decode(value);
+          const lines = chunkValue.split("\n").filter(line => line.trim() !== "");
+          
+          for (const line of lines) {
+            try {
+              const chunkData = JSON.parse(line);
+              
+              if (chunkData.thread_id) {
+                setThreadId(chunkData.thread_id);
+                continue;
+              }
+              
+              // Parse node updates from LangGraph
+              for (const key of Object.keys(chunkData)) {
+                const nodeData = chunkData[key];
+                if (nodeData?.messages && Array.isArray(nodeData.messages)) {
+                  
+                  // Check ALL messages for ORDER_DATA (it comes from tool responses)
+                  for (const msg of nodeData.messages) {
+                    const msgContent = msg.content || "";
+                    if (msgContent.includes("<!--ORDER_DATA:")) {
+                      const { orders } = parseOrderData(msgContent);
+                      if (orders) {
+                        // Save orders to the assistant message
+                        setMessages(prev => prev.map(m => 
+                          m.id === assistantMessageId 
+                            ? { ...m, orders }
+                            : m
+                        ));
+                      }
+                    }
+                  }
+                  
+                  // Get the AI message for the text content
+                  const aiMessages = nodeData.messages.filter(
+                    (m: { type?: string }) => m.type === "ai" || m.type === "AIMessage"
+                  );
+                  if (aiMessages.length > 0) {
+                    const lastAiMsg = aiMessages[aiMessages.length - 1];
+                    const content = lastAiMsg.content || "";
+                    
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === assistantMessageId 
+                        ? { ...msg, content: content }
+                        : msg
+                    ));
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing JSON chunk", e);
+            }
+          }
+        }
+      }
+
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessage: Message = {
@@ -85,7 +290,7 @@ export function AskAssistantDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
           size="lg"
@@ -94,12 +299,12 @@ export function AskAssistantDialog() {
           <div className="relative">
             <MessageSquare className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
             <span className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-400 rounded-full animate-pulse ring-2 ring-white"></span>
-          </div><div className=""></div>
+          </div>
           <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl">
-        {/* Header with glassmorphism */}
+        {/* Header */}
         <DialogHeader className="relative overflow-hidden px-5 py-4 flex items-center gap-4">
           <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"></div>
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iNCIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
@@ -121,15 +326,6 @@ export function AskAssistantDialog() {
               </DialogDescription>
             </div>
           </div>
-          {/* <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-            onClick={() => setMessages([])}
-            title="Clear Chat"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button> */}
         </DialogHeader>
 
         <div className="flex flex-col h-[480px] overflow-hidden bg-gradient-to-b from-neutral-50 to-white">
@@ -153,7 +349,7 @@ export function AskAssistantDialog() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center max-w-[300px]">
-                  {["Track my order", "Request refund", "Return policy"].map((text) => (
+                  {["List my orders", "Request refund", "Return policy"].map((text) => (
                     <button
                       key={text}
                       onClick={() => {
@@ -182,18 +378,30 @@ export function AskAssistantDialog() {
                         <Bot className="h-4 w-4 text-white" />
                       </div>
                     )}
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm ${
-                        message.role === "user"
-                          ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md"
-                          : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md"
-                      }`}
-                    >
-                      {message.content}
+                    <div className={`max-w-[85%] ${message.role === "user" ? "" : "flex-1"}`}>
+                      {/* Text content */}
+                      <div
+                        className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm ${
+                          message.role === "user"
+                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md"
+                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md"
+                        }`}
+                      >
+                        {message.content || (message.role === "assistant" ? "..." : "")}
+                      </div>
+                      
+                      {/* Order Cards - NEW! */}
+                      {message.orders && message.orders.length > 0 && (
+                        <div className="mt-3 space-y-3">
+                          {message.orders.map((order) => (
+                            <OrderCard key={order.id} order={order} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
-                {loading && (
+                {loading && messages[messages.length - 1]?.role !== "assistant" && (
                   <div className="flex justify-start animate-in slide-in-from-bottom-2">
                     <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200">
                       <Bot className="h-4 w-4 text-white" />
@@ -210,7 +418,7 @@ export function AskAssistantDialog() {
             )}
           </ScrollArea>
           
-          {/* Input area with glass effect */}
+          {/* Input area */}
           <div className="p-4 border-t border-neutral-100 bg-white/80 backdrop-blur-sm shrink-0">
             <form
               onSubmit={(e) => {
@@ -238,7 +446,10 @@ export function AskAssistantDialog() {
                   type="button"
                   size="icon"
                   variant="outline"
-                  onClick={() => setMessages([])}
+                  onClick={() => {
+                    setMessages([]);
+                    setThreadId(null);
+                  }}
                   className="h-12 w-12 rounded-2xl border-neutral-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
                   title="Clear chat"
                 >

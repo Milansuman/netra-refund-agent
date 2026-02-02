@@ -1,10 +1,41 @@
+"""
+REFUND AGENT WITH TOOLS
+========================
+
+This agent can:
+1. Have conversations about refunds
+2. CALL TOOLS to perform actions (like fetching orders)
+
+KEY CONCEPT: Tools
+------------------
+A "tool" is a function the LLM can decide to call. Think of it like giving
+the AI assistant access to your phone - it can make calls when needed.
+
+The LLM sees:
+- Tool name: "get_user_orders"
+- Tool description: "Fetch all orders for the current user"
+- Tool parameters: None (we handle user_id internally for security)
+
+When user says "list my orders", the LLM thinks:
+"I should call get_user_orders to get this information"
+"""
+
 from langgraph.graph import StateGraph, START, END
-from langchain.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage
+from langgraph.prebuilt import ToolNode
+from langchain.messages import (
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    AIMessage,
+    ToolMessage,
+)
 from langchain_groq import ChatGroq
-from typing import TypedDict
+from langchain_core.tools import tool
+from typing import TypedDict, Annotated, Literal
 from dotenv import load_dotenv
+import operator
 import os
-from models import refunds
+from models import refunds, orders
 import json
 from pydantic import BaseModel
 from db import db
@@ -16,14 +47,123 @@ if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not set")
 
 
+# =============================================================================
+# STATE DEFINITION
+# =============================================================================
+#
+# The "state" is like the agent's memory. It holds:
+# - messages: The conversation history
+# - user_id: Who is talking (so tools know whose orders to fetch)
+# - refund: The final refund classification (if determined)
+#
+# The `Annotated[list, operator.add]` means: when updating messages,
+# ADD new messages to the existing list (don't replace them)
+# =============================================================================
+
+
 class RefundAgentState(TypedDict):
-    order_item_ids: list[str]
-    messages: list[AnyMessage]
+    messages: Annotated[list[AnyMessage], operator.add]  # Append-only message list
+    user_id: int  # The logged-in user's ID
     refund: dict | None
     is_complete: bool
 
 
-_llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.3-70b-versatile")  # type: ignore
+# =============================================================================
+# LLM SETUP
+# =============================================================================
+
+_llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.3-70b-versatile")
+
+
+# =============================================================================
+# TOOLS
+# =============================================================================
+#
+# Tools are functions decorated with @tool. The decorator:
+# 1. Tells LangChain this is a tool
+# 2. Extracts the function's docstring as the tool description
+# 3. Extracts parameters from the function signature
+#
+# IMPORTANT: Tools receive the full state, so they can access user_id
+# =============================================================================
+
+
+# We'll create the tool dynamically to access user_id from state
+def create_get_orders_tool(user_id: int):
+    """
+    Create a tool that fetches orders for a specific user.
+
+    WHY create it dynamically?
+    --------------------------
+    The tool needs to know the user_id, but tools can't directly access
+    the agent's state. So we create the tool with user_id "baked in".
+
+    This is called a "closure" in programming - the function "remembers"
+    the user_id from when it was created.
+    """
+
+    @tool
+    def get_user_orders() -> str:
+        """
+        Fetch all orders for the current user.
+        Use this when the user asks about their orders, order history,
+        or wants to see what they've purchased.
+
+        IMPORTANT: Always share the FULL order details with the user including
+        order IDs, product names, quantities, and prices. Do not summarize.
+        """
+        try:
+            user_orders = orders.get_user_orders(user_id)
+
+            if not user_orders:
+                return "You don't have any orders yet."
+
+            # Create structured data for frontend to render as cards
+            # The special <!--ORDER_DATA:...--> marker tells the frontend
+            # to render this as cards instead of plain text
+            orders_data = []
+            for order in user_orders:
+                order_info = {
+                    "id": order["id"],
+                    "status": order["status"],
+                    "paid_amount": order["paid_amount"]
+                    / 100,  # Convert cents to dollars
+                    "payment_method": order["payment_method"],
+                    "items": [
+                        {
+                            "id": item["id"],
+                            "name": item["product"]["title"],
+                            "quantity": item["quantity"],
+                            "price": item["unit_price"] / 100,
+                        }
+                        for item in order["order_items"]
+                    ],
+                }
+                orders_data.append(order_info)
+
+            # Return both: structured data for frontend AND text for LLM
+            # The frontend will extract ORDER_DATA and render cards
+            result = f"<!--ORDER_DATA:{json.dumps(orders_data)}-->\n\n"
+            result += f"Here are your {len(user_orders)} orders:\n\n"
+            for order in user_orders:
+                result += f"**Order #{order['id']}** - Status: {order['status']}\n"
+                result += f"Total: ${order['paid_amount']/100:.2f}\n"
+                result += "Items:\n"
+                for item in order["order_items"]:
+                    result += f"  • {item['product']['title']} x{item['quantity']} @ ${item['unit_price']/100:.2f}\n"
+                result += "\n"
+
+            result += "Would you like to request a refund for any of these orders?"
+            return result
+        except Exception as e:
+            return f"Sorry, I couldn't fetch your orders: {str(e)}"
+
+    return get_user_orders
+
+
+# =============================================================================
+# SYSTEM PROMPT
+# =============================================================================
 
 
 class _RefundClassification(BaseModel):
@@ -31,20 +171,19 @@ class _RefundClassification(BaseModel):
     reason: str
 
 
-# SYSTEM PROMPT
-SYSTEM_PROMPT = """You are a refund agent that listens to the users complaints and categorizes it into one of the given refund categories. Ask questions to the user until you're sure of which refund type to classify the complaint as. Respond normally to the user until you've figured out the refund type, at which point respond with the following schema:
+SYSTEM_PROMPT = """You are a refund agent that helps users with their orders and refunds.
+
+IMPORTANT TOOL USAGE RULES:
+- When user mentions "orders", "my orders", "list orders", "show orders", or similar: YOU MUST call the get_user_orders tool. Do NOT make up order information.
+- ALWAYS call the tool first before responding about orders.
+- The tool will return real order data that you should present to the user.
+
+For refund requests, categorize complaints into types. Ask questions until you're sure, then respond with ONLY this JSON:
 
 {
-    refund_type: string,
-    reason: string // Summary of complaint
+    "refund_type": string,
+    "reason": string
 }
-
-Only use refund_type other if you're absolutely sure that the complaint doesn't fit into any of the other categories.
-
-GUIDELINES:
-- Ask questions and converse with the user until you're sure of the refund type
-- Return JSON of the given schema when you figure out the refund type
-- Do not add text before or after the JSON when you find the refund type
 
 REFUND CATEGORIES:
 """
@@ -59,19 +198,50 @@ SYSTEM_PROMPT += "\n".join(
 SYSTEM_PROMPT += "\nOther - Refund reason does not fit in any other category\n"
 
 
+# =============================================================================
+# GRAPH NODES
+# =============================================================================
+#
+# A LangGraph graph has "nodes" (steps) and "edges" (connections).
+#
+# Our flow:
+#   START → chat_node → (if tool call) → tools_node → chat_node
+#                     → (if no tool call) → END
+# =============================================================================
+
+
 def chat_node(state: RefundAgentState) -> dict:
-    """Process the conversation and generate a response."""
+    """
+    The main chat node. This:
+    1. Gets the LLM's response to the conversation
+    2. The LLM might respond with text OR request a tool call
+    """
     messages = state.get("messages", [])
+    user_id = state.get("user_id")
 
-    # Ensure system message is first
-    if not messages or not isinstance(messages[0], SystemMessage):
-        messages.insert(0, SystemMessage(content=SYSTEM_PROMPT))
+    print(f"[DEBUG] chat_node called with user_id={user_id}")
+    print(
+        f"[DEBUG] Latest message: {messages[-1].content[:100] if messages else 'none'}"
+    )
 
-    # Get LLM response
-    response = _llm.invoke(messages)
-    messages.append(response)
+    # Create tools with the user's ID
+    get_orders_tool = create_get_orders_tool(user_id)
+    tools = [get_orders_tool]
 
-    # Check if this is a refund classification (JSON response)
+    # Bind tools to the LLM with explicit tool configuration
+    # tool_choice="auto" lets the LLM decide, but with clear instructions
+    llm_with_tools = _llm.bind_tools(tools, tool_choice="auto")
+
+    # Get response (might be text OR a tool call)
+    response = llm_with_tools.invoke(messages)
+
+    # Debug: Check if tool was called
+    if hasattr(response, "tool_calls") and response.tool_calls:
+        print(f"[DEBUG] Tool calls: {response.tool_calls}")
+    else:
+        print(f"[DEBUG] No tool calls, response: {str(response.content)[:100]}")
+
+    # Check if conversation is complete (refund classified)
     refund = None
     is_complete = False
     try:
@@ -81,38 +251,113 @@ def chat_node(state: RefundAgentState) -> dict:
     except:
         pass
 
-    return {"messages": messages, "refund": refund, "is_complete": is_complete}
+    return {
+        "messages": [response],  # Add to message history
+        "refund": refund,
+        "is_complete": is_complete,
+    }
 
 
-# Build the graph - simple single-node design
+def should_continue(state: RefundAgentState) -> Literal["tools", "__end__"]:
+    """
+    Decide what to do next:
+    - If LLM requested a tool call → go to tools node
+    - Otherwise → end (we're done)
+
+    This is called a "conditional edge" in LangGraph.
+    """
+    messages = state.get("messages", [])
+    last_message = messages[-1] if messages else None
+
+    # If the last message has tool_calls, we need to execute them
+    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "tools"
+
+    return "__end__"
+
+
+def tools_node(state: RefundAgentState) -> dict:
+    """
+    Execute any tool calls the LLM requested.
+
+    This node:
+    1. Gets the last message (which contains tool calls)
+    2. Executes each tool
+    3. Returns the results as ToolMessages
+    """
+    messages = state.get("messages", [])
+    user_id = state.get("user_id")
+    last_message = messages[-1]
+
+    # Create the tool with user context
+    get_orders_tool = create_get_orders_tool(user_id)
+    tools_by_name = {"get_user_orders": get_orders_tool}
+
+    tool_messages = []
+    for tool_call in last_message.tool_calls:
+        tool_name = tool_call["name"]
+        tool_args = tool_call["args"]
+
+        # Execute the tool
+        if tool_name in tools_by_name:
+            result = tools_by_name[tool_name].invoke(tool_args)
+        else:
+            result = f"Unknown tool: {tool_name}"
+
+        # Create a ToolMessage with the result
+        tool_messages.append(
+            ToolMessage(content=str(result), tool_call_id=tool_call["id"])
+        )
+
+    return {"messages": tool_messages}
+
+
+# =============================================================================
+# BUILD THE GRAPH
+# =============================================================================
+
 _builder = StateGraph(RefundAgentState)
-_builder.add_node("chat", chat_node)
-_builder.add_edge(START, "chat")
-_builder.add_edge("chat", END)
 
+# Add nodes
+_builder.add_node("chat", chat_node)
+_builder.add_node("tools", tools_node)
+
+# Add edges
+_builder.add_edge(START, "chat")  # Start → chat
+_builder.add_conditional_edges(  # chat → (tools or end)
+    "chat", should_continue, {"tools": "tools", "__end__": END}
+)
+_builder.add_edge("tools", "chat")  # tools → chat (loop back)
+
+# Compile with checkpointer (for memory across messages)
 graph = _builder.compile(checkpointer=db.checkpointer)
+
+
+# =============================================================================
+# PUBLIC API
+# =============================================================================
 
 
 def invoke_graph(
     thread_id: str,
     prompt: str,
+    user_id: int,
     order_item_ids: list[str] | None = None,
 ):
     """
-    Invoke the refund agent with a user message.
+    Invoke the agent with a user message.
 
-    This is a simpler design that:
-    1. Loads the existing conversation from the checkpoint
-    2. Adds the new user message
-    3. Generates a response
-    4. Saves the updated state to the checkpoint
+    Parameters:
+    - thread_id: Unique ID for this conversation (for memory)
+    - prompt: The user's message
+    - user_id: The logged-in user's ID (for fetching their orders)
     """
     if not order_item_ids:
         order_item_ids = []
 
-    # Get existing state from checkpoint (if any)
     config = {"configurable": {"thread_id": thread_id}}
 
+    # Get existing messages from checkpoint
     try:
         state_snapshot = graph.get_state(config)
         existing_messages = (
@@ -121,7 +366,7 @@ def invoke_graph(
     except:
         existing_messages = []
 
-    # Add system message if it's a new conversation
+    # Add system message if new conversation
     if not existing_messages:
         existing_messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
@@ -131,8 +376,8 @@ def invoke_graph(
     # Run the graph
     for chunk in graph.stream(
         {
-            "order_item_ids": order_item_ids,
             "messages": existing_messages,
+            "user_id": user_id,
             "refund": None,
             "is_complete": False,
         },
