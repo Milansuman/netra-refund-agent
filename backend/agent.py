@@ -36,7 +36,7 @@ from typing import TypedDict, Annotated, Literal
 from dotenv import load_dotenv
 import operator
 import os
-from models import refunds, orders, policies
+from models import refunds, orders, policies, tickets, products
 import json
 from pydantic import BaseModel
 from db import db
@@ -77,6 +77,8 @@ class RefundAgentState(TypedDict):
     refund_details: dict | None  # Collected refund information
     evidence_required: bool  # Whether evidence is needed
     eligibility_checked: bool  # Whether eligibility was verified
+    wants_replacement: bool  # Whether user wants replacement instead of refund
+    replacement_available: bool  # Whether replacement product is in stock
 
 
 # =============================================================================
@@ -503,6 +505,108 @@ def create_process_refund_tool(user_id: int):
     return submit_refund_request
 
 
+def create_raise_ticket_tool(user_id: int):
+    """Tool to raise a support ticket for manual review"""
+    
+    @tool
+    def raise_support_ticket(
+        order_id: str | int,
+        title: str,
+        description: str
+    ) -> str:
+        """
+        Create a support ticket for cases requiring manual review or investigation.
+        
+        Use this when:
+        - The refund request is complex and needs human review
+        - There are suspicious or fraudulent activities suspected
+        - Policy doesn't clearly cover the specific case
+        - Evidence is inconclusive and requires expert assessment
+        - High-value items require additional verification
+        - Multiple failed refund attempts for the same issue
+        
+        Args:
+            order_id: The order ID this ticket relates to
+            title: Brief summary of the issue (e.g., "High-value damaged item requires verification")
+            description: Detailed information about the issue, user's request, and why manual review is needed
+        """
+        try:
+            # Convert to int if string
+            order_id = int(order_id)
+            
+            # Verify the order belongs to the user
+            order_check = db.execute(
+                "SELECT id FROM orders WHERE id = %s AND user_id = %s;",
+                (order_id, user_id)
+            )
+            
+            if not order_check:
+                return f"❌ Order #{order_id} not found or does not belong to you."
+            
+            # Create the ticket
+            ticket_id = tickets.create_ticket(
+                user_id=user_id,
+                order_id=order_id,
+                title=title,
+                description=description
+            )
+            
+            response = f"🎫 **Support Ticket Created**\n\n"
+            response += f"**Ticket ID:** #{ticket_id}\n"
+            response += f"**Order ID:** #{order_id}\n"
+            response += f"**Title:** {title}\n\n"
+            response += f"Your ticket has been escalated to our support team for manual review. "
+            response += f"A specialist will contact you within 24-48 hours via email.\n\n"
+            response += f"You can reference Ticket #{ticket_id} in any future communications about this issue."
+            
+            return response
+        except Exception as e:
+            return f"Error creating ticket: {str(e)}"
+    
+    return raise_support_ticket
+
+
+def create_check_stock_tool(user_id: int):
+    """Tool to check product stock availability for replacements"""
+    
+    @tool
+    def check_product_stock(product_id: str | int, quantity: str | int = 1) -> str:
+        """
+        Check if a product is in stock for replacement.
+        Use this when a user wants a replacement instead of a refund.
+        
+        Args:
+            product_id: The product ID to check stock for
+            quantity: The quantity needed (default: 1)
+        """
+        try:
+            # Convert to int if string
+            product_id = int(product_id)
+            if quantity is not None:
+                quantity = int(quantity)
+            
+            stock_info = products.check_stock_availability(product_id, quantity)
+            
+            response = f"📦 **Stock Availability Check**\n\n"
+            response += f"**Product:** {stock_info.get('product_name', 'Unknown')}\n"
+            response += f"**Status:** {stock_info['message']}\n"
+            response += f"**Available Quantity:** {stock_info['stock_quantity']}\n"
+            response += f"**Requested Quantity:** {quantity}\n\n"
+            
+            if stock_info['available']:
+                response += "✅ This product is available for replacement!\n"
+                response += "We can proceed with processing a replacement order for you."
+            else:
+                response += "❌ Unfortunately, this product is currently out of stock.\n"
+                response += "We can offer you a full refund instead."
+            
+            return response
+        except Exception as e:
+            return f"Error checking stock: {str(e)}"
+    
+    return check_product_stock
+
+
 # =============================================================================
 # SYSTEM PROMPT
 # =============================================================================
@@ -542,7 +646,15 @@ IMPORTANT TOOL USAGE RULES:
 8. To submit the refund:
    → Call submit_refund_request with all required details
 
-9. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+9. To raise a support ticket for manual review:
+   → Call raise_support_ticket with order_id, title, and description
+   → Use when cases require human intervention (see MANUAL REVIEW section below)
+
+10. To check if a product is in stock for replacement:
+   → Call check_product_stock with product_id and quantity
+   → Use when user wants a replacement instead of a refund
+
+11. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
 
 CRITICAL POLICY RULES:
 ======================
@@ -551,6 +663,44 @@ Before processing ANY refund, you MUST:
 2. Check for duplicate refunds (order facts will show if refund already exists)
 3. Remember: Shipping fees and platform fees are NON-REFUNDABLE
 4. Only item price + taxes can be refunded (minus proportional discounts)
+
+MANUAL REVIEW & TICKET ESCALATION:
+===================================
+You MUST raise a support ticket (using raise_support_ticket) in the following cases:
+
+1. **Suspected Fraud or Abuse:**
+   - Multiple refund requests from same user in short period
+   - Suspicious patterns or inconsistencies in user's claims
+   - Evidence appears manipulated or falsified
+
+2. **High-Value Items:**
+   - Items exceeding $500 (policy mentions high-value items may require return)
+   - Premium or luxury products requiring additional verification
+
+3. **Ambiguous or Uncovered Cases:**
+   - Refund reason doesn't clearly fit into policy categories
+   - Policy doesn't have specific guidelines for the situation
+   - User's request requires interpretation beyond policy scope
+
+4. **Inconclusive Evidence:**
+   - Evidence provided is unclear or insufficient
+   - Cannot determine eligibility based on available information
+   - Requires expert assessment (e.g., technical damage evaluation)
+
+5. **Complex Disputes:**
+   - User disputes policy decision
+   - Involves multiple orders or complicated order history
+   - Legal or regulatory considerations
+
+6. **Multiple Failed Attempts:**
+   - Same user has had multiple failed refund attempts
+   - Previous refunds were rejected for similar reasons
+
+When creating a ticket:
+- Include all relevant context: order details, refund request, evidence reviewed
+- Explain clearly why manual review is needed
+- Summarize the user's situation and their expectations
+- Let the user know their case has been escalated to specialists
 
 ELIGIBILITY ASSESSMENT:
 =======================
@@ -627,6 +777,15 @@ Step 4: EVIDENCE COLLECTION (when needed)
 - For WRONG_ITEM: request photos of received item
 - Validate that evidence is relevant and clear
 
+Step 4.5: REPLACEMENT OPTION (for eligible cases)
+- For DAMAGED_ITEM or WRONG_ITEM, ask if user wants replacement or refund
+- If user wants replacement:
+  * Get the product_id from the order item
+  * Call check_product_stock to verify availability
+  * If in stock: Inform user replacement will be arranged
+  * If out of stock: Offer refund instead
+- Continue to refund process if user chooses refund
+
 Step 5: ELIGIBILITY CHECK
 - Get general policy terms using get_general_policy_terms tool FIRST
 - Get order facts using get_order_facts tool
@@ -702,6 +861,8 @@ def chat_node(state: RefundAgentState) -> dict:
     get_order_facts_tool = create_get_order_facts_tool(user_id)
     calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
+    raise_ticket_tool = create_raise_ticket_tool(user_id)
+    check_stock_tool = create_check_stock_tool(user_id)
     
     tools = [
         get_orders_tool,
@@ -711,7 +872,9 @@ def chat_node(state: RefundAgentState) -> dict:
         get_general_terms_tool,
         get_order_facts_tool,
         calculate_refund_tool,
-        process_refund_tool
+        process_refund_tool,
+        raise_ticket_tool,
+        check_stock_tool
     ]
 
     # Bind tools to the LLM with explicit tool configuration
@@ -784,6 +947,8 @@ def tools_node(state: RefundAgentState) -> dict:
     get_order_facts_tool = create_get_order_facts_tool(user_id)
     calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
+    raise_ticket_tool = create_raise_ticket_tool(user_id)
+    check_stock_tool = create_check_stock_tool(user_id)
     
     tools_by_name = {
         "get_user_orders": get_orders_tool,
@@ -794,6 +959,8 @@ def tools_node(state: RefundAgentState) -> dict:
         "get_order_facts": get_order_facts_tool,
         "calculate_refund": calculate_refund_tool,
         "submit_refund_request": process_refund_tool,
+        "raise_support_ticket": raise_ticket_tool,
+        "check_product_stock": check_stock_tool,
     }
 
     tool_messages = []
@@ -865,6 +1032,8 @@ def clear_thread(thread_id: str) -> bool:
             "refund_details": None,
             "evidence_required": False,
             "eligibility_checked": False,
+            "wants_replacement": False,
+            "replacement_available": False,
         })
         return True
     except Exception as e:
@@ -919,6 +1088,8 @@ def invoke_graph(
             "refund_details": None,
             "evidence_required": False,
             "eligibility_checked": False,
+            "wants_replacement": False,
+            "replacement_available": False,
         },
         config=config,
         stream_mode="updates",
