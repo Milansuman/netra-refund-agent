@@ -24,6 +24,8 @@ This will start the necessary database and other services defined in your docker
 
 Navigate to the backend directory and run the database migrations:
 
+Create the .env file based on .env.example
+
 ```bash
 cd backend
 uv run push.py
