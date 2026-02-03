@@ -1,2 +1,4 @@
-alter table users add constraint users_email_unique unique(email);
-alter table users add constraint users_username_unique unique(username);
+create table if not exists sessions(
+    id text primary key,
+    user_id int not null references users(id)
+);
