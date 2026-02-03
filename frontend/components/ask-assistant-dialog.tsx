@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, MessageSquare, Trash2, Sparkles, Bot, Package, CreditCard, ShoppingBag } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -63,7 +64,7 @@ function parseOrderData(content: string): { orders: Order[] | null; cleanContent
   // [\s\S] matches any character including newlines
   const orderDataRegex = /<!--ORDER_DATA:([\s\S]*?)-->/;
   const match = content.match(orderDataRegex);
-  
+
   if (match) {
     try {
       const orders = JSON.parse(match[1]) as Order[];
@@ -74,7 +75,7 @@ function parseOrderData(content: string): { orders: Order[] | null; cleanContent
       return { orders: null, cleanContent: content };
     }
   }
-  
+
   return { orders: null, cleanContent: content };
 }
 
@@ -107,7 +108,7 @@ type ProductData = {
 function parseProductData(content: string): { productData: ProductData | null; cleanContent: string } {
   const productDataRegex = /<!--PRODUCT_DATA:([\s\S]*?)-->/;
   const match = content.match(productDataRegex);
-  
+
   if (match) {
     try {
       const productData = JSON.parse(match[1]) as ProductData;
@@ -117,7 +118,7 @@ function parseProductData(content: string): { productData: ProductData | null; c
       return { productData: null, cleanContent: content };
     }
   }
-  
+
   return { productData: null, cleanContent: content };
 }
 
@@ -138,9 +139,9 @@ function OrderCard({ order }: { order: Order }) {
     cancelled: "bg-red-100 text-red-800",
     delivered: "bg-emerald-100 text-emerald-800",
   };
-  
+
   const statusClass = statusColors[order.status.toLowerCase()] || "bg-gray-100 text-gray-800";
-  
+
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
       {/* Card Header */}
@@ -155,7 +156,7 @@ function OrderCard({ order }: { order: Order }) {
           </span>
         </div>
       </div>
-      
+
       {/* Card Body - Items List */}
       <div className="p-4 space-y-2">
         {order.items.map((item) => (
@@ -169,7 +170,7 @@ function OrderCard({ order }: { order: Order }) {
           </div>
         ))}
       </div>
-      
+
       {/* Card Footer */}
       <div className="bg-neutral-50 px-4 py-3 border-t border-neutral-100">
         <div className="flex items-center justify-between">
@@ -200,9 +201,9 @@ function ProductCard({ data }: { data: ProductData }) {
     delivered: "bg-green-100 text-green-800",
     cancelled: "bg-red-100 text-red-800",
   };
-  
+
   const statusClass = statusColors[data.status.toLowerCase()] || "bg-gray-100 text-gray-800";
-  
+
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       {/* Header */}
@@ -217,7 +218,7 @@ function ProductCard({ data }: { data: ProductData }) {
           </span>
         </div>
       </div>
-      
+
       {/* Products List */}
       <div className="p-4 space-y-4">
         {data.items.map((item) => (
@@ -243,7 +244,7 @@ function ProductCard({ data }: { data: ProductData }) {
           </div>
         ))}
       </div>
-      
+
       {/* Footer */}
       <div className="bg-neutral-50 px-4 py-3 border-t border-neutral-100">
         <div className="flex items-center justify-between">
@@ -320,7 +321,7 @@ export function AskAssistantDialog() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      
+
       const assistantMessageId = (Date.now() + 1).toString();
       setMessages((prev) => [
         ...prev,
@@ -332,58 +333,58 @@ export function AskAssistantDialog() {
       ]);
 
       let done = false;
-      
+
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
-        
+
         if (value) {
           const chunkValue = decoder.decode(value);
           const lines = chunkValue.split("\n").filter(line => line.trim() !== "");
-          
+
           for (const line of lines) {
             try {
               const chunkData = JSON.parse(line);
-              
+
               if (chunkData.thread_id) {
                 setThreadId(chunkData.thread_id);
                 continue;
               }
-              
+
               // Parse node updates from LangGraph
               for (const key of Object.keys(chunkData)) {
                 const nodeData = chunkData[key];
                 if (nodeData?.messages && Array.isArray(nodeData.messages)) {
-                  
+
                   // Check ALL messages for ORDER_DATA or PRODUCT_DATA (from tool responses)
                   for (const msg of nodeData.messages) {
                     const msgContent = msg.content || "";
-                    
+
                     // Check for ORDER_DATA (list of orders)
                     if (msgContent.includes("<!--ORDER_DATA:")) {
                       const { orders } = parseOrderData(msgContent);
                       if (orders) {
-                        setMessages(prev => prev.map(m => 
-                          m.id === assistantMessageId 
+                        setMessages(prev => prev.map(m =>
+                          m.id === assistantMessageId
                             ? { ...m, orders }
                             : m
                         ));
                       }
                     }
-                    
+
                     // Check for PRODUCT_DATA (single order details)
                     if (msgContent.includes("<!--PRODUCT_DATA:")) {
                       const { productData } = parseProductData(msgContent);
                       if (productData) {
-                        setMessages(prev => prev.map(m => 
-                          m.id === assistantMessageId 
+                        setMessages(prev => prev.map(m =>
+                          m.id === assistantMessageId
                             ? { ...m, productData }
                             : m
                         ));
                       }
                     }
                   }
-                  
+
                   // Get the AI message for the text content
                   const aiMessages = nodeData.messages.filter(
                     (m: { type?: string }) => m.type === "ai" || m.type === "AIMessage"
@@ -391,9 +392,9 @@ export function AskAssistantDialog() {
                   if (aiMessages.length > 0) {
                     const lastAiMsg = aiMessages[aiMessages.length - 1];
                     const content = lastAiMsg.content || "";
-                    
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === assistantMessageId 
+
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
                         ? { ...msg, content: content }
                         : msg
                     ));
@@ -439,7 +440,7 @@ export function AskAssistantDialog() {
         <DialogHeader className="relative overflow-hidden px-5 py-4 flex items-center gap-4">
           <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"></div>
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iNCIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
-          
+
           <div className="relative flex items-center gap-3 flex-1">
             <div className="relative">
               <div className="h-11 w-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/20">
@@ -499,9 +500,8 @@ export function AskAssistantDialog() {
                 {messages.map((message, index) => (
                   <div
                     key={message.id}
-                    className={`flex ${
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    } animate-in slide-in-from-bottom-2 duration-300`}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"
+                      } animate-in slide-in-from-bottom-2 duration-300`}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     {message.role === "assistant" && (
@@ -512,15 +512,22 @@ export function AskAssistantDialog() {
                     <div className={`max-w-[85%] ${message.role === "user" ? "" : "flex-1"}`}>
                       {/* Text content */}
                       <div
-                        className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm ${
-                          message.role === "user"
-                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md"
-                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md"
-                        }`}
+                        className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
+                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
+                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md prose prose-sm prose-neutral max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                          }`}
                       >
-                        {message.content || (message.role === "assistant" ? "..." : "")}
+                        {message.role === "assistant" ? (
+                          message.content ? (
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          ) : (
+                            "..."
+                          )
+                        ) : (
+                          message.content
+                        )}
                       </div>
-                      
+
                       {/* Order Cards - for order list */}
                       {message.orders && message.orders.length > 0 && (
                         <div className="mt-3 space-y-3">
@@ -529,7 +536,7 @@ export function AskAssistantDialog() {
                           ))}
                         </div>
                       )}
-                      
+
                       {/* Product Card - for single order details */}
                       {message.productData && (
                         <div className="mt-3">
@@ -555,7 +562,7 @@ export function AskAssistantDialog() {
               </div>
             )}
           </ScrollArea>
-          
+
           {/* Input area */}
           <div className="p-4 border-t border-neutral-100 bg-white/80 backdrop-blur-sm shrink-0">
             <form
