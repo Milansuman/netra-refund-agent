@@ -60,7 +60,12 @@ class Database:
         Set up the checkpointer tables in the database.
         This creates the tables LangGraph needs to store conversation state.
         """
-        self.checkpointer.setup()
+        # Use a temporary autocommit connection for setup
+        # This is required because setup() runs CREATE INDEX CONCURRENTLY
+        # which cannot run inside a transaction block
+        with psycopg.connect(self.database_url, autocommit=True) as conn:
+            checkpointer = PostgresSaver(conn)
+            checkpointer.setup()
         print("INFO: Database checkpointer initialized")
 
     def push(self):

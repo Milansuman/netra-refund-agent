@@ -1,5 +1,6 @@
 -- Truncate tables before inserting mock data
-truncate table order_refunds, order_discounts, order_items, orders, discounts, products restart identity cascade;
+truncate table order_refunds, order_discounts, order_items, orders, discounts, products, users restart identity cascade;
+
 
 -- Insert mock products
 insert into products(title, description, price, tax_percent) values
