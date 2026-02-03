@@ -134,7 +134,20 @@ After verification, the difference amount shall be refunded to the customer.
 * Certain cases may be flagged for **manual review** to prevent misuse or fraud.
 * Refund timelines may vary depending on payment provider and banking institutions.
 * The Platform reserves the right to amend this Policy at any time without prior notice.
+### Refund Amount Calculation
 
+* Refunds include the **item price** and **applicable taxes** paid on that item.
+* **Discounts and promotional codes** applied to the original purchase will be proportionally deducted from the refund amount.
+* **Shipping fees** are non-refundable unless the return is due to Platform error or a defective/incorrect item.
+* **Platform service fees** or **convenience fees** are non-refundable.
+* For partial refunds (e.g., only some items from an order), the refund amount is calculated proportionally.
+
+### Duplicate Refund Prevention
+
+* **Only one refund can be processed per order item.**
+* If a refund has already been approved or is being processed for an item, no additional refund requests will be accepted for the same item.
+* Customers found attempting duplicate refund claims may have their accounts flagged or suspended.
+* All refund requests are logged and cross-verified against existing refund records.
 ---
 
 For disputes not covered under this Policy, the Platform’s decision shall be final and binding, subject to applicable consumer protection laws.

@@ -98,3 +98,24 @@ def get_all_categories() -> list[str]:
         List of category strings.
     """
     return POLICY_CATEGORIES.copy()
+
+def get_general_terms() -> str:
+    """
+    Get the general terms section from the policy file.
+    This includes refund calculation rules, duplicate refund prevention, etc.
+    
+    Returns:
+        The general terms content as a string.
+    """
+    with open(POLICY_FILE_PATH, "r") as f:
+        content = f.read()
+    
+    # Extract the "General Terms" section
+    # It starts with "## General Terms" and goes to the end (or until next ## section)
+    match = re.search(r'## General Terms\n\n(.*?)(?=\n---\n\n|$)', content, re.DOTALL)
+    
+    print(match.group(1))
+    if match:
+        return match.group(1).strip()
+    
+    return "General terms not found in policy file."

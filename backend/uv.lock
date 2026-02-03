@@ -215,6 +215,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "langchain" },
     { name = "langchain-groq" },
+    { name = "langchain-litellm" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-postgres" },
     { name = "netra-sdk" },
@@ -227,6 +228,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.128.0" },
     { name = "langchain", specifier = ">=1.2.7" },
     { name = "langchain-groq", specifier = ">=1.1.1" },
+    { name = "langchain-litellm", specifier = ">=0.4.0" },
     { name = "langgraph", specifier = ">=1.0.7" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.0.4" },
     { name = "netra-sdk", specifier = ">=0.1.65" },
@@ -1183,6 +1185,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6e/13/f8d4ec7a28dd146e73b9c0b5868f7656453a4830b84998f8c4c1c73edf91/langchain_groq-1.1.1.tar.gz", hash = "sha256:09e04d7301fbd7b6b711187d23f42caf7f5222d5fa2cf04683dba9a3f273c4d2", size = 203548, upload-time = "2025-12-12T22:00:46.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/4a/3d6227a16fe9f79968414b50e50869519378b20653805e2e8fab283908e6/langchain_groq-1.1.1-py3-none-any.whl", hash = "sha256:1c6d5146f60205dcde09d7e47bb5291c295d3f0c7bcd2417e4d3a73a04bd1050", size = 19039, upload-time = "2025-12-12T22:00:45.86Z" },
+]
+
+[[package]]
+name = "langchain-litellm"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "litellm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/01/e73baaaf7af7b4f403f5f83e884d33b286f0ba8995c4edebc909d512cbf3/langchain_litellm-0.4.0.tar.gz", hash = "sha256:2bb58d3b805cbddf3944a546b953f78f124e278ce2e726045fe0d87ac8b06e8f", size = 15297, upload-time = "2026-02-02T23:23:25.753Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/4e/95b1b4f9c40db0f2ef40b014f82c6f495b789372c223542e777cd9599275/langchain_litellm-0.4.0-py3-none-any.whl", hash = "sha256:5842d753de54e91166a1ef39476628433d4312af7941eb74e01db1ea93e4e313", size = 15674, upload-time = "2026-02-02T23:23:26.904Z" },
 ]
 
 [[package]]

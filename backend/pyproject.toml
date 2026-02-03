@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.128.0",
     "langchain>=1.2.7",
     "langchain-groq>=1.1.1",
+    "langchain-litellm>=0.4.0",
     "langgraph>=1.0.7",
     "langgraph-checkpoint-postgres>=3.0.4",
     "netra-sdk>=0.1.65",

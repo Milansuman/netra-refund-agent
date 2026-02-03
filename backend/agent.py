@@ -30,6 +30,7 @@ from langchain.messages import (
     ToolMessage,
 )
 from langchain_groq import ChatGroq
+from langchain_litellm import ChatLiteLLM
 from langchain_core.tools import tool
 from typing import TypedDict, Annotated, Literal
 from dotenv import load_dotenv
@@ -42,9 +43,13 @@ from db import db
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not set")
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# if not GROQ_API_KEY:
+#     raise ValueError("GROQ_API_KEY not set")
+
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+if not LITELLM_API_KEY:
+    raise ValueError("LITELLM_API_KEY not set")
 
 
 # =============================================================================
@@ -78,8 +83,8 @@ class RefundAgentState(TypedDict):
 # LLM SETUP
 # =============================================================================
 
-_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-
+# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
 
 # =============================================================================
 # TOOLS
@@ -178,7 +183,7 @@ def create_get_order_details_tool(user_id: int):
     """
 
     @tool
-    def get_order_details(order_id: int) -> str:
+    def get_order_details(order_id: str | int) -> str:
         """
         Get detailed information about a specific order including all products.
         Use this when the user asks about a specific order by ID, like
@@ -188,6 +193,9 @@ def create_get_order_details_tool(user_id: int):
             order_id: The order ID to look up (e.g., 1, 2, 3)
         """
         try:
+            # Convert to int if string
+            order_id = int(order_id)
+            
             # Fetch all orders for this user
             user_orders = orders.get_user_orders(user_id)
 
@@ -325,11 +333,39 @@ def create_get_policy_tool(user_id: int):
     return get_refund_policy
 
 
+def create_get_general_terms_tool(user_id: int):
+    """Tool to retrieve general policy terms"""
+    
+    @tool
+    def get_general_policy_terms() -> str:
+        """
+        Get the general terms and conditions for refunds.
+        This includes important information about:
+        - How refund amounts are calculated
+        - What fees are refundable/non-refundable
+        - Duplicate refund prevention rules
+        - Refund processing methods
+        
+        IMPORTANT: Review these terms before processing any refund to ensure compliance.
+        """
+        try:
+            general_terms = policies.get_general_terms()
+            
+            response = "📋 **General Refund Policy Terms**\n\n"
+            response += general_terms
+            
+            return response
+        except Exception as e:
+            return f"Error retrieving general terms: {str(e)}"
+    
+    return get_general_policy_terms
+
+
 def create_get_order_facts_tool(user_id: int):
     """Tool to get factual order information for eligibility assessment"""
     
     @tool
-    def get_order_facts(order_id: int, order_item_id: int) -> str:
+    def get_order_facts(order_id: str | int, order_item_id: str | int) -> str:
         """
         Get factual information about an order and item for refund eligibility assessment.
         This includes: order status, dates, delivery status, and refund amount.
@@ -341,6 +377,10 @@ def create_get_order_facts_tool(user_id: int):
             order_item_id: The specific item ID within the order
         """
         try:
+            # Convert to int if string
+            order_id = int(order_id)
+            order_item_id = int(order_item_id)
+            
             facts = refunds.get_order_facts(order_id, order_item_id, user_id)
             
             if "error" in facts:
@@ -374,7 +414,7 @@ def create_calculate_refund_tool(user_id: int):
     """Tool to calculate refund amount for items"""
     
     @tool
-    def calculate_refund(order_item_id: int, quantity: int | None = None) -> str:
+    def calculate_refund(order_item_id: str | int, quantity: str | int | None = None) -> str:
         """
         Calculate the exact refund amount for an order item.
         Includes item price, tax, and deducts proportional discounts.
@@ -384,6 +424,11 @@ def create_calculate_refund_tool(user_id: int):
             quantity: Optional - specific quantity to refund (defaults to full quantity)
         """
         try:
+            # Convert to int if string
+            order_item_id = int(order_item_id)
+            if quantity is not None:
+                quantity = int(quantity)
+            
             calc = refunds.calculate_refund_amount(order_item_id, quantity)
             
             response = f"💰 **Refund Calculation**\n\n"
@@ -407,10 +452,10 @@ def create_process_refund_tool(user_id: int):
     
     @tool
     def submit_refund_request(
-        order_item_id: int,
+        order_item_id: str | int,
         refund_type: str,
         reason: str,
-        quantity: int | None = None,
+        quantity: str | int | None = None,
         evidence: str | None = None
     ) -> str:
         """
@@ -425,6 +470,11 @@ def create_process_refund_tool(user_id: int):
             evidence: Optional - description or reference to uploaded evidence
         """
         try:
+            # Convert to int if string
+            order_item_id = int(order_item_id)
+            if quantity is not None:
+                quantity = int(quantity)
+            
             # Calculate refund amount
             calc = refunds.calculate_refund_amount(order_item_id, quantity)
             
@@ -478,17 +528,29 @@ IMPORTANT TOOL USAGE RULES:
 4. To get the refund policy for a category:
    → Call get_refund_policy with the refund_type (e.g., DAMAGED_ITEM)
 
-5. To get factual order information for eligibility assessment:
+5. To get general policy terms (refund calculation, duplicate prevention, fees):
+   → Call get_general_policy_terms (no parameters needed)
+   → Review BEFORE processing any refund to understand what's refundable
+
+6. To get factual order information for eligibility assessment:
    → Call get_order_facts with order_id and order_item_id
    → Then YOU must evaluate against the policy to determine eligibility
 
-6. To calculate exact refund amount:
+7. To calculate exact refund amount:
    → Call calculate_refund with order_item_id and optional quantity
 
-7. To submit the refund:
+8. To submit the refund:
    → Call submit_refund_request with all required details
 
-8. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+9. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+
+CRITICAL POLICY RULES:
+======================
+Before processing ANY refund, you MUST:
+1. Call get_general_policy_terms to understand refund calculation and restrictions
+2. Check for duplicate refunds (order facts will show if refund already exists)
+3. Remember: Shipping fees and platform fees are NON-REFUNDABLE
+4. Only item price + taxes can be refunded (minus proportional discounts)
 
 ELIGIBILITY ASSESSMENT:
 =======================
@@ -566,10 +628,13 @@ Step 4: EVIDENCE COLLECTION (when needed)
 - Validate that evidence is relevant and clear
 
 Step 5: ELIGIBILITY CHECK
+- Get general policy terms using get_general_policy_terms tool FIRST
 - Get order facts using get_order_facts tool
 - Get relevant policy using get_refund_policy tool
+- Check for existing refunds (in order facts) - REJECT if duplicate
 - Read policy requirements carefully (time windows, conditions)
 - Compare facts against policy to determine eligibility
+- Verify no non-refundable fees are being claimed
 - If not eligible, explain why based on policy
 - If eligible, show max refund amount and proceed
 
@@ -633,6 +698,7 @@ def chat_node(state: RefundAgentState) -> dict:
     get_order_details_tool = create_get_order_details_tool(user_id)
     validate_ids_tool = create_validate_order_ids_tool(user_id)
     get_policy_tool = create_get_policy_tool(user_id)
+    get_general_terms_tool = create_get_general_terms_tool(user_id)
     get_order_facts_tool = create_get_order_facts_tool(user_id)
     calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
@@ -642,6 +708,7 @@ def chat_node(state: RefundAgentState) -> dict:
         get_order_details_tool,
         validate_ids_tool,
         get_policy_tool,
+        get_general_terms_tool,
         get_order_facts_tool,
         calculate_refund_tool,
         process_refund_tool
@@ -713,6 +780,7 @@ def tools_node(state: RefundAgentState) -> dict:
     get_order_details_tool = create_get_order_details_tool(user_id)
     validate_ids_tool = create_validate_order_ids_tool(user_id)
     get_policy_tool = create_get_policy_tool(user_id)
+    get_general_terms_tool = create_get_general_terms_tool(user_id)
     get_order_facts_tool = create_get_order_facts_tool(user_id)
     calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
@@ -722,6 +790,7 @@ def tools_node(state: RefundAgentState) -> dict:
         "get_order_details": get_order_details_tool,
         "validate_order_ids": validate_ids_tool,
         "get_refund_policy": get_policy_tool,
+        "get_general_policy_terms": get_general_terms_tool,
         "get_order_facts": get_order_facts_tool,
         "calculate_refund": calculate_refund_tool,
         "submit_refund_request": process_refund_tool,
