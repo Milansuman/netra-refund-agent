@@ -1,6 +1,9 @@
 -- Truncate tables before inserting mock data
 truncate table order_refunds, order_discounts, order_items, orders, discounts, products, users restart identity cascade;
 
+insert into users(id, email, password, username) 
+values (1, 'demo@example.com', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'demo')
+on conflict (id) do nothing;
 
 -- Insert mock products
 insert into products(title, description, price, tax_percent) values
