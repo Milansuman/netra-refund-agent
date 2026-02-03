@@ -461,7 +461,7 @@ export function AskAssistantDialog() {
           </div>
         </DialogHeader>
 
-        <div className="flex flex-col h-[480px] overflow-hidden bg-gradient-to-b from-neutral-50 to-white">
+        <div className="flex flex-col h-[600px] overflow-hidden bg-gradient-to-b from-neutral-50 to-white">
           <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-5">
@@ -514,8 +514,8 @@ export function AskAssistantDialog() {
                       {/* Text content */}
                       <div
                         className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
-                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
-                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
+                          ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
+                          : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
                           }`}
                       >
                         {message.role === "assistant" ? (
