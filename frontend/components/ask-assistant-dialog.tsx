@@ -277,13 +277,9 @@ export function AskAssistantDialog() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Clear thread when dialog closes
+  // Preserve chat history when dialog closes
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
-    if (!isOpen) {
-      setMessages([]);
-      setThreadId(null);
-    }
   };
 
   async function sendMessage() {
