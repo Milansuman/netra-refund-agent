@@ -35,7 +35,7 @@ from typing import TypedDict, Annotated, Literal
 from dotenv import load_dotenv
 import operator
 import os
-from models import refunds, orders
+from models import refunds, orders, policies
 import json
 from pydantic import BaseModel
 from db import db
@@ -66,13 +66,19 @@ class RefundAgentState(TypedDict):
     user_id: int  # The logged-in user's ID
     refund: dict | None
     is_complete: bool
+    # Refund processing state
+    selected_order_ids: list[int] | None  # Orders user wants to process
+    selected_items: dict | None  # {order_item_id: quantity}
+    refund_details: dict | None  # Collected refund information
+    evidence_required: bool  # Whether evidence is needed
+    eligibility_checked: bool  # Whether eligibility was verified
 
 
 # =============================================================================
 # LLM SETUP
 # =============================================================================
 
-_llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.3-70b-versatile")
+_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
 
 
 # =============================================================================
@@ -223,7 +229,7 @@ def create_get_order_details_tool(user_id: int):
                         item_data["discounts"].append(
                             f"{discount['code']} ({discount['percent']}% off)"
                         )
-                    elif discount.get("amount"):
+                    elif discount.get("amount") and discount["amount"]:
                         item_data["discounts"].append(
                             f"{discount['code']} (${discount['amount']/100:.2f} off)"
                         )
@@ -247,6 +253,206 @@ def create_get_order_details_tool(user_id: int):
     return get_order_details
 
 
+def create_validate_order_ids_tool(user_id: int):
+    """Tool to validate and parse order IDs from user input"""
+    
+    @tool
+    def validate_order_ids(order_ids: str) -> str:
+        """
+        Validate order IDs provided by the user. Accepts multiple formats:
+        - Single ID: "123"
+        - Comma-separated: "123, 456, 789"
+        - Space-separated: "123 456 789"
+        - With # symbols: "#123, #456"
+        - Pasted list with newlines
+        
+        Returns which orders are valid and belong to the user.
+        
+        Args:
+            order_ids: The order IDs to validate (any format)
+        """
+        try:
+            result = orders.validate_order_ids(order_ids, user_id)
+            
+            response = f"📋 Order ID Validation:\n\n"
+            
+            if result["found_ids"]:
+                response += f"✅ Found {len(result['found_ids'])} valid order(s): {', '.join(f'#{oid}' for oid in result['found_ids'])}\n\n"
+            
+            if result["not_found_ids"]:
+                response += f"❌ Not found or not yours: {', '.join(f'#{oid}' for oid in result['not_found_ids'])}\n\n"
+            
+            if result["invalid_ids"]:
+                response += f"⚠️ Invalid format: {', '.join(result['invalid_ids'])}\n\n"
+            
+            if result["found_ids"]:
+                response += "Would you like to proceed with the refund for these orders?"
+            else:
+                response += "No valid orders found. Please check your order numbers and try again."
+            
+            return response
+        except Exception as e:
+            return f"Error validating order IDs: {str(e)}"
+    
+    return validate_order_ids
+
+
+def create_get_policy_tool(user_id: int):
+    """Tool to retrieve policy text for a refund category"""
+    
+    @tool
+    def get_refund_policy(refund_type: str) -> str:
+        """
+        Get the full policy text for a specific refund category.
+        Use this to understand the eligibility rules, time windows, and requirements.
+        
+        Args:
+            refund_type: The refund type (e.g., DAMAGED_ITEM, MISSING_ITEM, LATE_DELIVERY)
+        """
+        try:
+            policy = policies.get_policy_by_category(refund_type)
+            
+            if not policy:
+                return f"Policy not found for {refund_type}. Available categories: {', '.join(policies.get_all_categories())}"
+            
+            response = f"📜 **{policy['title']} Policy**\n\n"
+            response += policy['content']
+            
+            return response
+        except Exception as e:
+            return f"Error retrieving policy: {str(e)}"
+    
+    return get_refund_policy
+
+
+def create_get_order_facts_tool(user_id: int):
+    """Tool to get factual order information for eligibility assessment"""
+    
+    @tool
+    def get_order_facts(order_id: int, order_item_id: int) -> str:
+        """
+        Get factual information about an order and item for refund eligibility assessment.
+        This includes: order status, dates, delivery status, and refund amount.
+        
+        Use this with the policy to determine if a refund is eligible.
+        
+        Args:
+            order_id: The order ID
+            order_item_id: The specific item ID within the order
+        """
+        try:
+            facts = refunds.get_order_facts(order_id, order_item_id, user_id)
+            
+            if "error" in facts:
+                return f"❌ {facts['message']}"
+            
+            response = "📊 **Order Facts**\n\n"
+            response += f"**Order ID:** #{facts['order_id']}\n"
+            response += f"**Item ID:** #{facts['order_item_id']}\n"
+            response += f"**Order Status:** {facts['order_status']}\n"
+            response += f"**Ordered:** {facts['created_at']} ({facts['days_since_order']} days ago)\n"
+            
+            if facts['is_delivered']:
+                response += f"**Delivered:** {facts['delivered_at']} ({facts['days_since_delivery']} days ago)\n"
+            else:
+                response += f"**Delivered:** Not yet delivered\n"
+            
+            response += f"\n**Max Refund Amount:** ${facts['max_refund_amount']/100:.2f}\n"
+            response += f"**Breakdown:** {facts['refund_breakdown']}\n"
+            
+            if facts['existing_refund_status']:
+                response += f"\n⚠️ **Existing Refund:** {facts['existing_refund_status']}\n"
+            
+            return response
+        except Exception as e:
+            return f"Error getting order facts: {str(e)}"
+    
+    return get_order_facts
+
+
+def create_calculate_refund_tool(user_id: int):
+    """Tool to calculate refund amount for items"""
+    
+    @tool
+    def calculate_refund(order_item_id: int, quantity: int | None = None) -> str:
+        """
+        Calculate the exact refund amount for an order item.
+        Includes item price, tax, and deducts proportional discounts.
+        
+        Args:
+            order_item_id: The item ID to calculate refund for
+            quantity: Optional - specific quantity to refund (defaults to full quantity)
+        """
+        try:
+            calc = refunds.calculate_refund_amount(order_item_id, quantity)
+            
+            response = f"💰 **Refund Calculation**\n\n"
+            response += f"**Total Refund:** ${calc['total_refund']/100:.2f}\n\n"
+            response += f"**Breakdown:**\n"
+            response += f"• Item Price: ${calc['item_price']/100:.2f}\n"
+            response += f"• Tax: ${calc['tax_amount']/100:.2f}\n"
+            if calc['discount_amount'] > 0:
+                response += f"• Discounts: -${calc['discount_amount']/100:.2f}\n"
+            response += f"\n{calc['breakdown']}"
+            
+            return response
+        except Exception as e:
+            return f"Error calculating refund: {str(e)}"
+    
+    return calculate_refund
+
+
+def create_process_refund_tool(user_id: int):
+    """Tool to create and submit a refund request"""
+    
+    @tool
+    def submit_refund_request(
+        order_item_id: int,
+        refund_type: str,
+        reason: str,
+        quantity: int | None = None,
+        evidence: str | None = None
+    ) -> str:
+        """
+        Submit a refund request for an order item. This creates the refund
+        in the system and marks it as PENDING for review.
+        
+        Args:
+            order_item_id: The item ID to refund
+            refund_type: Type from taxonomy (e.g., DAMAGED_ITEM, MISSING_ITEM)
+            reason: Detailed explanation for the refund
+            quantity: Optional - specific quantity to refund
+            evidence: Optional - description or reference to uploaded evidence
+        """
+        try:
+            # Calculate refund amount
+            calc = refunds.calculate_refund_amount(order_item_id, quantity)
+            
+            # Create refund record
+            refund_id = refunds.create_refund(
+                order_item_id=order_item_id,
+                refund_type=refund_type,
+                reason=reason,
+                amount=calc["total_refund"],
+                evidence=evidence,
+                quantity=quantity
+            )
+            
+            response = f"✅ **Refund Request Submitted!**\n\n"
+            response += f"**Refund ID:** #{refund_id}\n"
+            response += f"**Status:** PENDING REVIEW\n"
+            response += f"**Amount:** ${calc['total_refund']/100:.2f}\n\n"
+            response += f"Your refund request has been submitted and will be reviewed within 24-48 hours. "
+            response += f"You'll receive a confirmation email once processed.\n\n"
+            response += f"Is there anything else I can help you with?"
+            
+            return response
+        except Exception as e:
+            return f"Error submitting refund: {str(e)}"
+    
+    return submit_refund_request
+
+
 # =============================================================================
 # SYSTEM PROMPT
 # =============================================================================
@@ -266,15 +472,122 @@ IMPORTANT TOOL USAGE RULES:
 2. When user asks about a SPECIFIC order by number like "order 1", "order #4", "products in order 2":
    → Call get_order_details with the order_id
 
-3. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
-4. The tools will return real data that you should present to the user.
+3. When user provides order IDs for refund (single, multiple, or pasted list):
+   → Call validate_order_ids to validate and deduplicate the IDs
 
-For refund requests, categorize complaints into types. Ask questions until you're sure, then respond with ONLY this JSON:
+4. To get the refund policy for a category:
+   → Call get_refund_policy with the refund_type (e.g., DAMAGED_ITEM)
 
-{
-    "refund_type": string,
-    "reason": string
-}
+5. To get factual order information for eligibility assessment:
+   → Call get_order_facts with order_id and order_item_id
+   → Then YOU must evaluate against the policy to determine eligibility
+
+6. To calculate exact refund amount:
+   → Call calculate_refund with order_item_id and optional quantity
+
+7. To submit the refund:
+   → Call submit_refund_request with all required details
+
+8. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+
+ELIGIBILITY ASSESSMENT:
+=======================
+YOU are responsible for determining eligibility by:
+1. Getting the order facts (dates, status, delivery info)
+2. Getting the relevant policy text for the refund type
+3. Reading the policy carefully and applying the rules
+4. Making a decision based on the policy requirements
+
+Example: For DAMAGED_ITEM, the policy says "within 7 days of delivery"
+- Get order facts: delivered 5 days ago → ELIGIBLE
+- Get order facts: delivered 10 days ago → NOT ELIGIBLE
+
+Do NOT hardcode time windows - read them from the policy each time.
+
+REFUND WORKFLOW:
+================
+
+Step 1: ORDER IDENTIFICATION
+- Accept order IDs in any format (single, comma-separated, pasted list)
+- Validate and confirm which orders to process
+- Show order details and let user select specific items
+
+Step 2: ITEM SELECTION
+- For multi-item orders, ask which specific items need refund
+- Ask for quantity if partial refund needed
+- Confirm the items before proceeding
+
+Step 3: REFUND CLASSIFICATION
+- Determine the refund type from the taxonomy
+- Ask dynamic follow-up questions based on type:
+
+For DAMAGED_ITEM:
+- "How severe is the damage? (minor, major, completely unusable)"
+- "Was the packaging damaged when delivered?"
+- "Have you opened or used the product?"
+- "Can you describe the damage?"
+- Request photos if damage is not clear
+
+For MISSING_ITEM:
+- "Which specific item(s) are missing?"
+- "Was the package opened/tampered with?"
+- "Did you check all packaging materials?"
+
+For LATE_DELIVERY:
+- "When was the original delivery date?"
+- "When did you actually receive it?"
+- "Was this a time-sensitive order?"
+
+For WRONG_ITEM:
+- "What item did you receive instead?"
+- "Is the item still unopened?"
+
+For DUPLICATE_CHARGE:
+- "How many times were you charged?"
+- "Do you have multiple order confirmations?"
+
+For CANCELLATION:
+- "When did you request cancellation?"
+- "Has the item been shipped yet?"
+
+For RETURN_PICKUP_FAILED:
+- "When was the pickup scheduled?"
+- "Were you available at the scheduled time?"
+- "Did you receive any notification from courier?"
+
+For PAYMENT_DEBITED_BUT_FAILED:
+- "When was the payment made?"
+- "Did you receive an order confirmation?"
+
+Step 4: EVIDENCE COLLECTION (when needed)
+- For DAMAGED_ITEM: request clear photos showing damage
+- For MISSING_ITEM: request package photos if available
+- For WRONG_ITEM: request photos of received item
+- Validate that evidence is relevant and clear
+
+Step 5: ELIGIBILITY CHECK
+- Get order facts using get_order_facts tool
+- Get relevant policy using get_refund_policy tool
+- Read policy requirements carefully (time windows, conditions)
+- Compare facts against policy to determine eligibility
+- If not eligible, explain why based on policy
+- If eligible, show max refund amount and proceed
+
+Step 6: REFUND CALCULATION
+- Calculate exact amount: item price + tax - discounts
+- Show breakdown to user
+- Confirm amount before proceeding
+
+Step 7: SUBMISSION
+- Create refund request in system
+- Provide refund ID and expected timeline
+- Offer to help with anything else
+
+DYNAMIC QUESTIONING:
+- Don't ask all questions at once
+- Ask follow-ups based on user's answers
+- If user provides evidence/details upfront, skip redundant questions
+- Be conversational, not robotic
 
 REFUND CATEGORIES:
 """
@@ -315,10 +628,24 @@ def chat_node(state: RefundAgentState) -> dict:
         f"[DEBUG] Latest message: {messages[-1].content[:100] if messages else 'none'}"
     )
 
-    # Create tools with the user's ID
+    # Create all tools with the user's ID
     get_orders_tool = create_get_orders_tool(user_id)
     get_order_details_tool = create_get_order_details_tool(user_id)
-    tools = [get_orders_tool, get_order_details_tool]
+    validate_ids_tool = create_validate_order_ids_tool(user_id)
+    get_policy_tool = create_get_policy_tool(user_id)
+    get_order_facts_tool = create_get_order_facts_tool(user_id)
+    calculate_refund_tool = create_calculate_refund_tool(user_id)
+    process_refund_tool = create_process_refund_tool(user_id)
+    
+    tools = [
+        get_orders_tool,
+        get_order_details_tool,
+        validate_ids_tool,
+        get_policy_tool,
+        get_order_facts_tool,
+        calculate_refund_tool,
+        process_refund_tool
+    ]
 
     # Bind tools to the LLM with explicit tool configuration
     # tool_choice="auto" lets the LLM decide, but with clear instructions
@@ -384,9 +711,20 @@ def tools_node(state: RefundAgentState) -> dict:
     # Create the tools with user context
     get_orders_tool = create_get_orders_tool(user_id)
     get_order_details_tool = create_get_order_details_tool(user_id)
+    validate_ids_tool = create_validate_order_ids_tool(user_id)
+    get_policy_tool = create_get_policy_tool(user_id)
+    get_order_facts_tool = create_get_order_facts_tool(user_id)
+    calculate_refund_tool = create_calculate_refund_tool(user_id)
+    process_refund_tool = create_process_refund_tool(user_id)
+    
     tools_by_name = {
         "get_user_orders": get_orders_tool,
         "get_order_details": get_order_details_tool,
+        "validate_order_ids": validate_ids_tool,
+        "get_refund_policy": get_policy_tool,
+        "get_order_facts": get_order_facts_tool,
+        "calculate_refund": calculate_refund_tool,
+        "submit_refund_request": process_refund_tool,
     }
 
     tool_messages = []
@@ -434,6 +772,37 @@ graph = _builder.compile(checkpointer=db.checkpointer)
 # =============================================================================
 
 
+def clear_thread(thread_id: str) -> bool:
+    """
+    Clear all state for a specific thread/conversation.
+    
+    Parameters:
+    - thread_id: The thread ID to clear
+    
+    Returns:
+    - True if successful
+    """
+    try:
+        config = {"configurable": {"thread_id": thread_id}}
+        # LangGraph's checkpointer doesn't have a direct delete method,
+        # but we can update the state to empty
+        graph.update_state(config, {
+            "messages": [],
+            "user_id": 0,
+            "refund": None,
+            "is_complete": False,
+            "selected_order_ids": None,
+            "selected_items": None,
+            "refund_details": None,
+            "evidence_required": False,
+            "eligibility_checked": False,
+        })
+        return True
+    except Exception as e:
+        print(f"Error clearing thread {thread_id}: {e}")
+        return False
+
+
 def invoke_graph(
     thread_id: str,
     prompt: str,
@@ -476,6 +845,11 @@ def invoke_graph(
             "user_id": user_id,
             "refund": None,
             "is_complete": False,
+            "selected_order_ids": None,
+            "selected_items": None,
+            "refund_details": None,
+            "evidence_required": False,
+            "eligibility_checked": False,
         },
         config=config,
         stream_mode="updates",

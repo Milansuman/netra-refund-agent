@@ -9,27 +9,27 @@ import uuid
 import json
 
 from models import users, orders
-from agent import invoke_graph
+from agent import invoke_graph, clear_thread
 
 from contextlib import asynccontextmanager
 from db import db
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Setup the database tables for the checkpointer
-    try:
-        db.setup_checkpointer()
-        db.push()
-        print("INFO: Database initialized (Checkpointer + Migrations)")
-    except Exception as e:
-        print(f"WARNING: Could not setup checkpointer: {e}")
-    yield
-    # Shutdown logic (if any) can go here
-    db.close()
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Startup: Setup the database tables for the checkpointer
+#     try:
+#         db.setup_checkpointer()
+#         db.push()
+#         print("INFO: Database initialized (Checkpointer + Migrations)")
+#     except Exception as e:
+#         print(f"WARNING: Could not setup checkpointer: {e}")
+#     yield
+#     # Shutdown logic (if any) can go here
+#     db.close()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 # Dependencies
@@ -157,6 +157,29 @@ def chat(
 
         return StreamingResponse(generate(), media_type="application/x-ndjson")
     except ValueError as e:
+        print(e)
+        response.status_code = 400
+        return {"detail": str(e)}
+
+
+@app.delete("/chat/{thread_id}")
+def clear_chat(
+    thread_id: str,
+    response: Response,
+    user: Annotated[users.User, Depends(validate_session)],
+):
+    """
+    Clear/delete a conversation thread.
+    This removes all state associated with the thread_id.
+    """
+    try:
+        success = clear_thread(thread_id)
+        if success:
+            return {"message": "Thread cleared successfully"}
+        else:
+            response.status_code = 500
+            return {"detail": "Failed to clear thread"}
+    except Exception as e:
         print(e)
         response.status_code = 400
         return {"detail": str(e)}

@@ -584,7 +584,17 @@ export function AskAssistantDialog() {
                   type="button"
                   size="icon"
                   variant="outline"
-                  onClick={() => {
+                  onClick={async () => {
+                    if (threadId) {
+                      try {
+                        await fetch(`http://localhost:8000/chat/${threadId}`, {
+                          method: "DELETE",
+                          credentials: "include",
+                        });
+                      } catch (error) {
+                        console.error("Failed to clear chat on server:", error);
+                      }
+                    }
                     setMessages([]);
                     setThreadId(null);
                   }}

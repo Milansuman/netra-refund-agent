@@ -79,3 +79,80 @@ def get_user_orders(user_id: int) -> list[Order]:
         orders.append(order)
 
     return orders
+
+def get_order_by_id(order_id: int, user_id: int) -> Order | None:
+    """Get a specific order by ID, verifying ownership"""
+    orders = get_user_orders(user_id)
+    for order in orders:
+        if order["id"] == order_id:
+            return order
+    return None
+
+def validate_order_ids(order_ids_input: str, user_id: int) -> dict:
+    """
+    Validate and parse order IDs from various input formats.
+    Accepts: single ID, comma-separated, space-separated, or newline-separated
+    Returns: validated IDs, invalid IDs, and deduped list
+    """
+    import re
+    
+    # Parse input - handle multiple formats
+    # Remove common separators and split
+    cleaned = re.sub(r'[,\s\n\r]+', ',', order_ids_input.strip())
+    id_strings = [s.strip() for s in cleaned.split(',') if s.strip()]
+    
+    valid_ids = []
+    invalid_ids = []
+    
+    for id_str in id_strings:
+        # Remove # symbol if present
+        id_str = id_str.replace('#', '').strip()
+        try:
+            order_id = int(id_str)
+            if order_id > 0:
+                valid_ids.append(order_id)
+            else:
+                invalid_ids.append(id_str)
+        except ValueError:
+            invalid_ids.append(id_str)
+    
+    # Deduplicate while preserving order
+    deduped_ids = list(dict.fromkeys(valid_ids))
+    
+    # Verify which orders exist and belong to user
+    user_orders = get_user_orders(user_id)
+    user_order_ids = {order["id"] for order in user_orders}
+    
+    found_ids = [oid for oid in deduped_ids if oid in user_order_ids]
+    not_found_ids = [oid for oid in deduped_ids if oid not in user_order_ids]
+    
+    return {
+        "found_ids": found_ids,
+        "not_found_ids": not_found_ids,
+        "invalid_ids": invalid_ids,
+        "total_input": len(id_strings),
+        "total_valid": len(found_ids)
+    }
+
+def get_order_timeline(order_id: int) -> dict | None:
+    """Get timeline information for an order"""
+    result = db.execute(
+        "select created_at, delivered_at, status from orders where id = %s;",
+        (order_id,)
+    )
+    
+    if not result:
+        return None
+    
+    created_at, delivered_at, status = result[0]
+    
+    return {
+        "order_id": order_id,
+        "created_at": created_at,
+        "delivered_at": delivered_at,
+        "status": status,
+        "days_since_order": (datetime.now() - created_at).days if created_at else None,
+        "days_since_delivery": (datetime.now() - delivered_at).days if delivered_at else None
+    }
+
+from datetime import datetime
