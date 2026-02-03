@@ -37,8 +37,8 @@ def validate_session(
     response: Response, session_id: Annotated[str | None, Cookie()] = None
 ):
     try:
-        if not session_id:
-            raise HTTPException(403)
+        # if not session_id:
+        #     raise HTTPException(403)
 
         return users.get_session_user(session_id=session_id)
     except ValueError as e:

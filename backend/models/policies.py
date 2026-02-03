@@ -113,8 +113,7 @@ def get_general_terms() -> str:
     # Extract the "General Terms" section
     # It starts with "## General Terms" and goes to the end (or until next ## section)
     match = re.search(r'## General Terms\n\n(.*?)(?=\n---\n\n|$)', content, re.DOTALL)
-    
-    print(match.group(1))
+
     if match:
         return match.group(1).strip()
     

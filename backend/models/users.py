@@ -6,7 +6,7 @@ class User(TypedDict):
     id: int
     email: str
     username: str
-    session_id: str
+    session_id: str | None
 
 def signup(username: str, email: str, password: str):
     db.execute("insert into users(email, password, username) values (%s,%s,%s);", (email, sha256(password.encode()).hexdigest(), username))
@@ -24,7 +24,21 @@ def login(username_or_email: str, password: str) -> str:
 def logout(session_id: str) -> None:
     db.execute("delete from sessions where id = %s;", (session_id,))
 
-def get_session_user(session_id: str) -> User:
+def get_session_user(session_id: str | None) -> User:
+    # If no session_id provided, return the first user
+    if session_id is None:
+        first_users = db.execute("select id, username, email from users order by id limit 1;")
+        if len(first_users) > 0:
+            (user_id, username, email) = first_users[0]
+            return {
+                "id": user_id,
+                "email": email,
+                "username": username,
+                "session_id": session_id
+            }
+        else:
+            raise ValueError("No users exist in the database")
+    
     users = db.execute("select users.id, users.username, users.email from users inner join sessions on sessions.user_id = users.id where sessions.id = %s;", (session_id,))
 
     if len(users) > 0:
@@ -36,4 +50,15 @@ def get_session_user(session_id: str) -> User:
             "session_id": session_id
         }
     else:
-        raise ValueError("Session does not exist")
+        # If no session exists, return the first user in the table
+        first_users = db.execute("select id, username, email from users order by id limit 1;")
+        if len(first_users) > 0:
+            (user_id, username, email) = first_users[0]
+            return {
+                "id": user_id,
+                "email": email,
+                "username": username,
+                "session_id": session_id
+            }
+        else:
+            raise ValueError("No users exist in the database")
