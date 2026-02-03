@@ -14,6 +14,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, MessageSquare, Trash2, Sparkles, Bot, Package, CreditCard, ShoppingBag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import "@/styles/markdown.css";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -514,7 +515,7 @@ export function AskAssistantDialog() {
                       <div
                         className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
                             ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
-                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md prose prose-sm prose-neutral max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
                           }`}
                       >
                         {message.role === "assistant" ? (
