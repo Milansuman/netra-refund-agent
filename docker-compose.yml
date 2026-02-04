@@ -15,6 +15,47 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - netra-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: netra-backend
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/netra"
+      NETRA_API_KEY: ${NETRA_API_KEY}
+      NETRA_OTLP_ENDPOINT: ${NETRA_OTLP_ENDPOINT:-https://api.demo.getnetra.ai/telemetry}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      LITELLM_API_KEY: ${LITELLM_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - netra-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: netra-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - netra-network
 
 volumes:
   postgres_data:
+
+networks:
+  netra-network:
+    driver: bridge
