@@ -43,13 +43,13 @@ from db import db
 
 load_dotenv()
 
-# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# if not GROQ_API_KEY:
-#     raise ValueError("GROQ_API_KEY not set")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not set")
 
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-if not LITELLM_API_KEY:
-    raise ValueError("LITELLM_API_KEY not set")
+# LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+# if not LITELLM_API_KEY:
+#     raise ValueError("LITELLM_API_KEY not set")
 
 
 # =============================================================================
@@ -85,8 +85,8 @@ class RefundAgentState(TypedDict):
 # LLM SETUP
 # =============================================================================
 
-# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
+_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+# _llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
 
 # =============================================================================
 # TOOLS
@@ -607,6 +607,82 @@ def create_check_stock_tool(user_id: int):
     return check_product_stock
 
 
+def create_search_orders_by_product_tool(user_id: int):
+    """Tool to search orders by product name/keyword"""
+    
+    @tool
+    def search_orders_by_product(product_name: str) -> str:
+        """
+        Search for orders containing a specific product by name or keyword.
+        Use this when the user mentions a product name they want to return/refund
+        but doesn't provide an order ID.
+        
+        For example:
+        - "I want to return the laptop stand"
+        - "I need a refund for the headphones"
+        - "The wireless mouse I ordered is defective"
+        
+        Args:
+            product_name: The product name or keyword to search for (e.g., "laptop stand", "headphones")
+        """
+        try:
+            matching_orders = orders.search_orders_by_product(user_id, product_name)
+            
+            if not matching_orders:
+                return f"No orders found containing '{product_name}'. Please check the product name or use 'show my orders' to see all your orders."
+            
+            # Create structured data for frontend rendering
+            orders_data = []
+            for order in matching_orders:
+                # Filter to only show the matching items
+                matching_items = []
+                for item in order["order_items"]:
+                    product_title = item["product"]["title"].lower()
+                    product_desc = (item["product"]["description"] or "").lower()
+                    if product_name.lower() in product_title or product_name.lower() in product_desc:
+                        matching_items.append({
+                            "id": item["id"],
+                            "name": item["product"]["title"],
+                            "quantity": item["quantity"],
+                            "price": item["unit_price"] / 100,
+                        })
+                
+                order_info = {
+                    "id": order["id"],
+                    "status": order["status"],
+                    "paid_amount": order["paid_amount"] / 100,
+                    "payment_method": order["payment_method"],
+                    "items": matching_items,
+                }
+                orders_data.append(order_info)
+            
+            # Return both structured data and text
+            result = f"<!--ORDER_DATA:{json.dumps(orders_data)}-->\n\n"
+            result += f"I found {len(matching_orders)} order(s) containing '{product_name}':\n\n"
+            
+            for order in matching_orders:
+                result += f"**Order #{order['id']}** - Status: {order['status']}\n"
+                result += f"Total: ${order['paid_amount']/100:.2f}\n"
+                result += "Matching items:\n"
+                for item in order["order_items"]:
+                    product_title = item["product"]["title"].lower()
+                    product_desc = (item["product"]["description"] or "").lower()
+                    if product_name.lower() in product_title or product_name.lower() in product_desc:
+                        result += f"  • {item['product']['title']} (Item ID: {item['id']}) x{item['quantity']} @ ${item['unit_price']/100:.2f}\n"
+                result += "\n"
+            
+            if len(matching_orders) == 1:
+                result += "Would you like to proceed with a refund for this order?"
+            else:
+                result += "Which order would you like to process a refund for?"
+            
+            return result
+        except Exception as e:
+            return f"Error searching for orders: {str(e)}"
+    
+    return search_orders_by_product
+
+
 # =============================================================================
 # SYSTEM PROMPT
 # =============================================================================
@@ -623,38 +699,44 @@ IMPORTANT TOOL USAGE RULES:
 1. When user mentions "orders", "my orders", "list orders", "show orders": 
    → Call get_user_orders to fetch all orders
 
-2. When user asks about a SPECIFIC order by number like "order 1", "order #4", "products in order 2":
+2. When user mentions a PRODUCT NAME they want to return/refund (like "laptop stand", "headphones", "wireless mouse") 
+   BUT does NOT provide an order ID:
+   → Call search_orders_by_product with the product name to find matching orders
+   → Show the matching orders and ask which one they want to process
+   → Examples: "I want to return the laptop stand", "The headphones are broken", "refund my wireless mouse"
+
+3. When user asks about a SPECIFIC order by number like "order 1", "order #4", "products in order 2":
    → Call get_order_details with the order_id
 
-3. When user provides order IDs for refund (single, multiple, or pasted list):
+4. When user provides order IDs for refund (single, multiple, or pasted list):
    → Call validate_order_ids to validate and deduplicate the IDs
 
-4. To get the refund policy for a category:
+5. To get the refund policy for a category:
    → Call get_refund_policy with the refund_type (e.g., DAMAGED_ITEM)
 
-5. To get general policy terms (refund calculation, duplicate prevention, fees):
+6. To get general policy terms (refund calculation, duplicate prevention, fees):
    → Call get_general_policy_terms (no parameters needed)
    → Review BEFORE processing any refund to understand what's refundable
 
-6. To get factual order information for eligibility assessment:
+7. To get factual order information for eligibility assessment:
    → Call get_order_facts with order_id and order_item_id
    → Then YOU must evaluate against the policy to determine eligibility
 
-7. To calculate exact refund amount:
+8. To calculate exact refund amount:
    → Call calculate_refund with order_item_id and optional quantity
 
-8. To submit the refund:
+9. To submit the refund:
    → Call submit_refund_request with all required details
 
-9. To raise a support ticket for manual review:
+10. To raise a support ticket for manual review:
    → Call raise_support_ticket with order_id, title, and description
    → Use when cases require human intervention (see MANUAL REVIEW section below)
 
-10. To check if a product is in stock for replacement:
+11. To check if a product is in stock for replacement:
    → Call check_product_stock with product_id and quantity
    → Use when user wants a replacement instead of a refund
 
-11. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
+12. ALWAYS call the appropriate tool first. Do NOT make up order or product information.
 
 CRITICAL POLICY RULES:
 ======================
@@ -863,6 +945,7 @@ def chat_node(state: RefundAgentState) -> dict:
     process_refund_tool = create_process_refund_tool(user_id)
     raise_ticket_tool = create_raise_ticket_tool(user_id)
     check_stock_tool = create_check_stock_tool(user_id)
+    search_orders_tool = create_search_orders_by_product_tool(user_id)
     
     tools = [
         get_orders_tool,
@@ -874,7 +957,8 @@ def chat_node(state: RefundAgentState) -> dict:
         calculate_refund_tool,
         process_refund_tool,
         raise_ticket_tool,
-        check_stock_tool
+        check_stock_tool,
+        search_orders_tool
     ]
 
     # Bind tools to the LLM with explicit tool configuration
@@ -949,6 +1033,7 @@ def tools_node(state: RefundAgentState) -> dict:
     process_refund_tool = create_process_refund_tool(user_id)
     raise_ticket_tool = create_raise_ticket_tool(user_id)
     check_stock_tool = create_check_stock_tool(user_id)
+    search_orders_tool = create_search_orders_by_product_tool(user_id)
     
     tools_by_name = {
         "get_user_orders": get_orders_tool,
@@ -961,6 +1046,7 @@ def tools_node(state: RefundAgentState) -> dict:
         "submit_refund_request": process_refund_tool,
         "raise_support_ticket": raise_ticket_tool,
         "check_product_stock": check_stock_tool,
+        "search_orders_by_product": search_orders_tool,
     }
 
     tool_messages = []

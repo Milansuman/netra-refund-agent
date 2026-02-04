@@ -156,3 +156,34 @@ def get_order_timeline(order_id: int) -> dict | None:
     }
 
 from datetime import datetime
+
+def search_orders_by_product(user_id: int, product_query: str) -> list[Order]:
+    """
+    Search user's orders by product name/title.
+    Returns orders that contain products matching the search query.
+    
+    Args:
+        user_id: The user's ID
+        product_query: The product name/keyword to search for (case-insensitive)
+    
+    Returns:
+        List of orders containing matching products
+    """
+    # Get all user orders
+    all_orders = get_user_orders(user_id)
+    
+    # Normalize the query for case-insensitive matching
+    query_lower = product_query.lower().strip()
+    
+    matching_orders = []
+    for order in all_orders:
+        for item in order["order_items"]:
+            product_title = item["product"]["title"].lower()
+            product_desc = (item["product"]["description"] or "").lower()
+            
+            # Check if query matches product title or description
+            if query_lower in product_title or query_lower in product_desc:
+                matching_orders.append(order)
+                break  # Don't add the same order multiple times
+    
+    return matching_orders
