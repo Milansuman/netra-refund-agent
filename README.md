@@ -1,65 +1,79 @@
 # netra-refund-agent
 
-A refund agent application with FastAPI backend and Next.js frontend.
+A fully containerized refund agent application with FastAPI backend and Next.js frontend.
 
 ## Prerequisites
 
 - Docker and Docker Compose
-- [uv](https://github.com/astral-sh/uv) (Python package manager)
-- Node.js and npm
 
 ## Setup Instructions
 
-### 1. Start Docker Services
+### 1. Environment Configuration
 
-First, start the required services using Docker Compose:
+Create a `.env` file in the root directory from the example:
 
 ```bash
-docker compose up
+cp .env.example .env
 ```
 
-This will start the necessary database and other services defined in your docker-compose.yml.
+Edit `.env` and add your API keys:
 
-### 2. Backend Setup
+```env
+NETRA_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
+LITELLM_API_KEY=your_key_here
+```
 
-Navigate to the backend directory and run the database migrations:
+### 2. Start All Services
 
-Create the .env file based on .env.example
+Build and start all services (PostgreSQL, backend, and frontend) with Docker Compose:
 
+```bash
+docker compose up --build
+```
+
+This will:
+- Start PostgreSQL database on port 5432
+- Build and start the FastAPI backend on port 8000
+- Build and start the Next.js frontend on port 3000
+
+All services run in production mode and are connected on the same Docker network.
+
+### 3. Access the Application
+
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **API Documentation:** http://localhost:8000/docs
+
+To stop all services, press `Ctrl+C` or run:
+
+```bash
+docker compose down
+```
+
+## Development Setup
+
+For local development without Docker:
+
+### Backend
 ```bash
 cd backend
+# Install dependencies
+uv sync
+# Run migrations
 uv run push.py
-```
-
-Then start the FastAPI development server:
-
-```bash
+# Start development server
 uv run fastapi dev
 ```
 
-The backend API will be available at the default FastAPI port.
-
-### 3. Frontend Setup
-
-In a new terminal, navigate to the frontend directory:
-
+### Frontend
 ```bash
 cd frontend
-```
-
-Install the dependencies:
-
-```bash
-npm i
-```
-
-Start the Next.js development server:
-
-```bash
+# Install dependencies
+npm install
+# Start development server
 npm run dev
 ```
-
-The frontend will be available at the default Next.js port (typically http://localhost:3000).
 
 ## Project Structure
 
