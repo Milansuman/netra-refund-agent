@@ -1,0 +1,1 @@
+alter table order_refunds add constraint unique_refund_requests unique (order_item_id, refund_taxonomy_id);
