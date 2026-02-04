@@ -43,13 +43,13 @@ from db import db
 
 load_dotenv()
 
-# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# if not GROQ_API_KEY:
-#     raise ValueError("GROQ_API_KEY not set")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not set")
 
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-if not LITELLM_API_KEY:
-    raise ValueError("LITELLM_API_KEY not set")
+# LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+# if not LITELLM_API_KEY:
+#     raise ValueError("LITELLM_API_KEY not set")
 
 
 # =============================================================================
@@ -85,8 +85,8 @@ class RefundAgentState(TypedDict):
 # LLM SETUP
 # =============================================================================
 
-# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
+_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+# _llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
 
 # =============================================================================
 # TOOLS
@@ -855,7 +855,7 @@ def should_continue(state: RefundAgentState) -> Literal["tools", "__end__"]:
     last_message = messages[-1] if messages else None
 
     # If the last message has tool_calls, we need to execute them
-    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
+    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls: #type: ignore
         return "tools"
 
     return "__end__"
@@ -902,7 +902,7 @@ def tools_node(state: RefundAgentState) -> dict:
     }
 
     tool_messages = []
-    for tool_call in last_message.tool_calls:
+    for tool_call in last_message.tool_calls: #type: ignore
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
 
@@ -960,7 +960,7 @@ def clear_thread(thread_id: str) -> bool:
         config = {"configurable": {"thread_id": thread_id}}
         # LangGraph's checkpointer doesn't have a direct delete method,
         # but we can update the state to empty
-        graph.update_state(config, {
+        graph.update_state(config, { #type: ignore
             "messages": [],
             "user_id": 0,
             "refund": None,
@@ -1000,7 +1000,7 @@ def invoke_graph(
 
     # Get existing messages from checkpoint
     try:
-        state_snapshot = graph.get_state(config)
+        state_snapshot = graph.get_state(config) #type: ignore
         existing_messages = (
             state_snapshot.values.get("messages", []) if state_snapshot.values else []
         )
@@ -1012,11 +1012,11 @@ def invoke_graph(
         existing_messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
     # Add the new user message
-    existing_messages.append(HumanMessage(content=prompt))
+    existing_messages.append(HumanMessage(content=prompt)) #type: ignore
 
     # Run the graph
     for chunk in graph.stream(
-        {
+        { #type: ignore
             "messages": existing_messages,
             "user_id": user_id,
             "refund": None,
@@ -1029,7 +1029,7 @@ def invoke_graph(
             "wants_replacement": False,
             "replacement_available": False,
         },
-        config=config,
+        config=config, #type: ignore
         stream_mode="updates",
     ):
         json_chunk = json.dumps(
