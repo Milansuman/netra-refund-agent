@@ -270,6 +270,7 @@ export function AskAssistantDialog() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -282,18 +283,23 @@ export function AskAssistantDialog() {
     setOpen(isOpen);
   };
 
-  async function sendMessage() {
-    if (!input.trim() || loading) return;
+  async function sendMessage(content?: string) {
+    const messageContent = content || input;
+    if (!messageContent.trim() || loading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: messageContent,
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    const currentInput = input;
-    setInput("");
+
+    // Clear input if it was typed
+    if (!content) {
+      setInput("");
+    }
+
     setLoading(true);
 
     try {
@@ -304,7 +310,7 @@ export function AskAssistantDialog() {
         },
         credentials: "include",
         body: JSON.stringify({
-          prompt: currentInput,
+          prompt: messageContent,
           thread_id: threadId,
           order_item_ids: []
         }),
@@ -418,6 +424,36 @@ export function AskAssistantDialog() {
     }
   }
 
+  const agents = [
+    {
+      id: "refund_agent",
+      name: "Refund Agent",
+      description: "Process returns, refunds, and replacements for your orders.",
+      icon: Sparkles,
+      color: "from-violet-500 to-indigo-600",
+      bgColor: "bg-indigo-50",
+      borderColor: "border-indigo-200"
+    },
+    {
+      id: "order_agent",
+      name: "Order Agent",
+      description: "Track shipments, view order history, and manage deliveries.",
+      icon: Package,
+      color: "from-emerald-400 to-teal-500",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200"
+    },
+    {
+      id: "support_agent",
+      name: "General Support",
+      description: "Help with account settings, payments, and general inquiries.",
+      icon: Bot,
+      color: "from-amber-400 to-orange-500",
+      bgColor: "bg-amber-50",
+      borderColor: "border-amber-200"
+    }
+  ];
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -432,193 +468,247 @@ export function AskAssistantDialog() {
           <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl">
+      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl h-[600px] flex flex-col">
+
         {/* Header */}
-        <DialogHeader className="relative overflow-hidden px-5 py-4 flex items-center gap-4">
+        <DialogHeader className="relative overflow-hidden px-5 py-4 shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"></div>
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iNCIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
 
-          <div className="relative flex items-center gap-3 flex-1">
-            <div className="relative">
+          <div className="relative flex items-center gap-3">
+            {selectedAgent ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white hover:bg-white/20 -ml-2"
+                onClick={() => setSelectedAgent(null)}
+              >
+                <span className="sr-only">Back</span>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4"><path d="M8.84182 3.13514C9.04327 3.32401 9.05348 3.64042 8.86462 3.84188L5.43521 7.49991L8.86462 11.1579C9.05348 11.3594 9.04327 11.6758 8.84182 11.8647C8.64036 12.0535 8.32394 12.0433 8.13508 11.8419L4.38508 7.84188C4.20477 7.64955 4.20477 7.35027 4.38508 7.15794L8.13508 3.15794C8.32394 2.95648 8.64036 2.94628 8.84182 3.13514Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+              </Button>
+            ) : (
               <div className="h-11 w-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/20">
                 <Bot className="h-6 w-6 text-white" />
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-white shadow-lg"></span>
-            </div>
+            )}
+
             <div>
               <DialogTitle className="text-base font-semibold text-white flex items-center gap-2">
-                Refund Assistant
+                {selectedAgent ? agents.find(a => a.id === selectedAgent)?.name : "AI Assistant"}
                 <Sparkles className="h-4 w-4 text-amber-300" />
               </DialogTitle>
               <DialogDescription className="text-xs text-white/70">
-                AI-powered support • Always online
+                {selectedAgent ? "Always online" : "Select an agent to help you"}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex flex-col h-[600px] overflow-hidden bg-gradient-to-b from-neutral-50 to-white">
-          <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-5">
-                <div className="relative">
-                  <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center shadow-lg shadow-indigo-100">
-                    <Bot className="h-10 w-10 text-indigo-600" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-lg">
-                    <Sparkles className="h-3 w-3 text-white" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="font-semibold text-lg text-neutral-900">
-                    How can I help you today?
-                  </p>
-                  <p className="text-sm text-neutral-500 max-w-[260px] mx-auto leading-relaxed">
-                    I can assist with returns, refunds, order tracking, and more.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center max-w-[300px]">
-                  {["List my orders", "Request refund", "Return policy"].map((text) => (
-                    <button
-                      key={text}
-                      onClick={() => {
-                        setInput(text);
-                        setTimeout(() => sendMessage(), 100);
-                      }}
-                      className="px-4 py-2 text-xs font-medium rounded-full bg-white border border-neutral-200 text-neutral-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm"
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
+        {/* CONTENT */}
+        {!selectedAgent ? (
+          /* AGENT SELECTION SCREEN */
+          <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-neutral-50 to-white">
+            <div className="space-y-6">
+              <div className="text-center space-y-2 mb-8">
+                <h3 className="text-xl font-bold text-neutral-900">How can we help you?</h3>
+                <p className="text-neutral-500 text-sm">Choose a specialized agent for your needs</p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message, index) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"
-                      } animate-in slide-in-from-bottom-2 duration-300`}
-                    style={{ animationDelay: `${index * 50}ms` }}
+
+              <div className="grid gap-4">
+                {agents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => setSelectedAgent(agent.id)}
+                    className="flex items-start gap-4 p-4 rounded-2xl bg-white border border-neutral-200 shadow-sm hover:shadow-md hover:border-indigo-300 hover:scale-[1.02] transition-all text-left group"
                   >
-                    {message.role === "assistant" && (
-                      <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200">
-                        <Bot className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                    <div className={`max-w-[85%] ${message.role === "user" ? "" : "flex-1"}`}>
-                      {/* Text content */}
-                      <div
-                        className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
-                          ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
-                          : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
-                          }`}
-                      >
-                        {message.role === "assistant" ? (
-                          message.content ? (
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${agent.color} flex items-center justify-center shadow-lg shrink-0 group-hover:scale-110 transition-transform`}>
+                      <agent.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-neutral-900 mb-1">{agent.name}</h4>
+                      <p className="text-sm text-neutral-500 leading-relaxed">{agent.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* CHAT SCREEN */
+          <div className="flex flex-col flex-1 overflow-hidden bg-gradient-to-b from-neutral-50 to-white relative">
+            <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-5">
+                  <div className="relative">
+                    <div className={`h-20 w-20 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-lg opacity-20`}></div>
+                    <div className={`absolute inset-0 h-20 w-20 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-lg scale-90`}>
+                      {(() => {
+                        const Icon = agents.find(a => a.id === selectedAgent)?.icon || Bot;
+                        return <Icon className="h-10 w-10 text-white" />;
+                      })()}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-lg text-neutral-900">
+                      Hello! I'm your {agents.find(a => a.id === selectedAgent)?.name}.
+                    </p>
+                    <p className="text-sm text-neutral-500 max-w-[260px] mx-auto leading-relaxed">
+                      {selectedAgent === "refund_agent"
+                        ? "I can help you process returns, check eligibility, and track your refunds."
+                        : "I'm here to assist you with your inquiries."}
+                    </p>
+                  </div>
+
+                  {selectedAgent === "refund_agent" && (
+                    <div className="flex flex-wrap gap-2 justify-center max-w-[300px]">
+                      {["List my orders", "Return policy", "Request refund"].map((text) => (
+                        <button
+                          key={text}
+                          onClick={() => {
+                            setInput(text);
+                            // We need to wait for state update in a real app, but here we can just call sendMessage with content
+                            // actually sendMessage requires input state if content not passed, but we can pass content.
+                            // But better to simulate typing:
+
+                            // For simplicity let's just trigger it immediately
+                            sendMessage(text);
+                          }}
+                          className="px-4 py-2 text-xs font-medium rounded-full bg-white border border-neutral-200 text-neutral-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm"
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"
+                        } animate-in slide-in-from-bottom-2 duration-300`}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      {message.role === "assistant" && (
+                        <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200`}>
+                          <Bot className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                      <div className={`max-w-[85%] ${message.role === "user" ? "" : "flex-1"}`}>
+                        {/* Text content */}
+                        <div
+                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
+                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
+                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
+                            }`}
+                        >
+                          {message.role === "assistant" ? (
+                            message.content ? (
+                              <ReactMarkdown>{message.content}</ReactMarkdown>
+                            ) : (
+                              "..."
+                            )
                           ) : (
-                            "..."
-                          )
-                        ) : (
-                          message.content
+                            message.content
+                          )}
+                        </div>
+
+                        {/* Order Cards - for order list */}
+                        {message.orders && message.orders.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {message.orders.map((order) => (
+                              <OrderCard key={order.id} order={order} />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Product Card - for single order details */}
+                        {message.productData && (
+                          <div className="mt-3">
+                            <ProductCard data={message.productData} />
+                          </div>
                         )}
                       </div>
-
-                      {/* Order Cards - for order list */}
-                      {message.orders && message.orders.length > 0 && (
-                        <div className="mt-3 space-y-3">
-                          {message.orders.map((order) => (
-                            <OrderCard key={order.id} order={order} />
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Product Card - for single order details */}
-                      {message.productData && (
-                        <div className="mt-3">
-                          <ProductCard data={message.productData} />
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
-                {loading && messages[messages.length - 1]?.role !== "assistant" && (
-                  <div className="flex justify-start animate-in slide-in-from-bottom-2">
-                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200">
-                      <Bot className="h-4 w-4 text-white" />
+                  ))}
+                  {loading && messages[messages.length - 1]?.role !== "assistant" && (
+                    <div className="flex justify-start animate-in slide-in-from-bottom-2">
+                      <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200`}>
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="bg-white border border-neutral-100 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5 shadow-sm">
+                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></span>
+                      </div>
                     </div>
-                    <div className="bg-white border border-neutral-100 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5 shadow-sm">
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></span>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </ScrollArea>
-
-          {/* Input area */}
-          <div className="p-4 border-t border-neutral-100 bg-white/80 backdrop-blur-sm shrink-0">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendMessage();
-              }}
-              className="flex items-end gap-2"
-            >
-              <div className="flex-1 relative">
-                <Textarea
-                  placeholder="Type your message..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  className="min-h-[48px] max-h-[120px] resize-none rounded-2xl border-neutral-200 bg-neutral-50 focus:bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-300 py-3 px-4 pr-12 transition-all [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                />
-              </div>
-              {messages.length > 0 && (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={async () => {
-                    if (threadId) {
-                      try {
-                        await fetch(`http://localhost:8000/chat/${threadId}`, {
-                          method: "DELETE",
-                          credentials: "include",
-                        });
-                      } catch (error) {
-                        console.error("Failed to clear chat on server:", error);
-                      }
-                    }
-                    setMessages([]);
-                    setThreadId(null);
-                  }}
-                  className="h-12 w-12 rounded-2xl border-neutral-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
-                  title="Clear chat"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </Button>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
               )}
-              <Button
-                type="submit"
-                size="icon"
-                disabled={loading || !input.trim()}
-                className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none"
+            </ScrollArea>
+
+            {/* Input area */}
+            <div className="p-4 border-t border-neutral-100 bg-white/80 backdrop-blur-sm shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendMessage();
+                }}
+                className="flex items-end gap-2"
               >
-                <Send className="h-5 w-5" />
-              </Button>
-            </form>
+                <div className="flex-1 relative">
+                  <Textarea
+                    placeholder="Type your message..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="min-h-[48px] max-h-[120px] resize-none rounded-2xl border-neutral-200 bg-neutral-50 focus:bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-300 py-3 px-4 pr-12 transition-all [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                  />
+                </div>
+                {messages.length > 0 && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={async () => {
+                      if (threadId) {
+                        try {
+                          await fetch(`http://localhost:8000/chat/${threadId}`, {
+                            method: "DELETE",
+                            credentials: "include",
+                          });
+                        } catch (error) {
+                          console.error("Failed to clear chat on server:", error);
+                        }
+                      }
+                      setMessages([]);
+                      setThreadId(null);
+                    }}
+                    className="h-12 w-12 rounded-2xl border-neutral-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                    title="Clear chat"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={loading || !input.trim()}
+                  className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none"
+                >
+                  <Send className="h-5 w-5" />
+                </Button>
+              </form>
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
