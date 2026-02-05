@@ -13,7 +13,15 @@ from agent import invoke_graph, clear_thread
 
 from contextlib import asynccontextmanager
 from db import db
+import os
+from netra import Netra
 
+Netra.init(
+    headers=f"x-api-key={os.getenv('NETRA_API_KEY')}",
+    app_name="Refund agent",
+    debug_mode=True,
+    trace_content=True
+)
 
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):

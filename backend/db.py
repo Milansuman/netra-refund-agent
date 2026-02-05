@@ -53,7 +53,7 @@ class Database:
         )
 
         # Create checkpointer with the pool (not a single connection)
-        self.checkpointer = PostgresSaver(self.checkpointer_pool)
+        self.checkpointer = PostgresSaver(self.checkpointer_pool) #type: ignore
 
     def setup_checkpointer(self):
         """
@@ -64,7 +64,7 @@ class Database:
         # This is required because setup() runs CREATE INDEX CONCURRENTLY
         # which cannot run inside a transaction block
         with psycopg.connect(self.database_url, autocommit=True) as conn:
-            checkpointer = PostgresSaver(conn)
+            checkpointer = PostgresSaver(conn) #type: ignore
             checkpointer.setup()
         print("INFO: Database checkpointer initialized")
 

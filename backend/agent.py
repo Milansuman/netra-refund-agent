@@ -43,13 +43,13 @@ from db import db
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not set")
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# if not GROQ_API_KEY:
+#     raise ValueError("GROQ_API_KEY not set")
 
-# LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-# if not LITELLM_API_KEY:
-#     raise ValueError("LITELLM_API_KEY not set")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+if not LITELLM_API_KEY:
+    raise ValueError("LITELLM_API_KEY not set")
 
 
 # =============================================================================
@@ -85,8 +85,8 @@ class RefundAgentState(TypedDict):
 # LLM SETUP
 # =============================================================================
 
-_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-# _llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4-turbo")
+# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4o")
 
 # =============================================================================
 # TOOLS
