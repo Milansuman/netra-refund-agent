@@ -132,54 +132,61 @@ function parseProductData(content: string): { productData: ProductData | null; c
 // =============================================================================
 
 function OrderCard({ order }: { order: Order }) {
-  // Status color mapping
+  // Status color mapping for dark theme
   const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    completed: "bg-green-100 text-green-800",
-    shipped: "bg-blue-100 text-blue-800",
-    cancelled: "bg-red-100 text-red-800",
-    delivered: "bg-emerald-100 text-emerald-800",
+    pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    completed: "bg-green-500/10 text-green-400 border-green-500/20",
+    shipped: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
+    delivered: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   };
 
-  const statusClass = statusColors[order.status.toLowerCase()] || "bg-gray-100 text-gray-800";
+  const statusClass = statusColors[order.status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-neutral-900/50 backdrop-blur-sm rounded-xl border border-white/5 shadow-inner overflow-hidden hover:border-indigo-500/30 transition-all group">
       {/* Card Header */}
-      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-3 border-b border-neutral-100">
+      <div className="bg-white/5 px-4 py-3 border-b border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-indigo-600" />
-            <span className="font-semibold text-neutral-900">Order #{order.id}</span>
+            <Package className="h-4 w-4 text-indigo-400" />
+            <span className="font-medium text-neutral-200">Order #{order.id}</span>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
             {order.status}
           </span>
         </div>
       </div>
 
       {/* Card Body - Items List */}
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-3">
         {order.items.map((item) => (
           <div key={item.id} className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-neutral-700">{item.name}</span>
-              <span className="text-neutral-400">×{item.quantity}</span>
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                <ShoppingBag className="h-4 w-4 text-neutral-500" />
+              </div>
+              <div>
+                <span className="block text-neutral-300 font-medium">{item.name}</span>
+                <span className="text-xs text-neutral-500">Qty: {item.quantity}</span>
+              </div>
             </div>
-            <span className="text-neutral-600">${item.price.toFixed(2)}</span>
+            <span className="text-neutral-400 font-mono">${item.price.toFixed(2)}</span>
           </div>
         ))}
       </div>
 
       {/* Card Footer */}
-      <div className="bg-neutral-50 px-4 py-3 border-t border-neutral-100">
+      <div className="bg-white/5 px-4 py-3 border-t border-white/5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-neutral-500">
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
             <CreditCard className="h-3.5 w-3.5" />
             <span>{order.payment_method}</span>
           </div>
-          <span className="font-semibold text-indigo-600">${order.paid_amount.toFixed(2)}</span>
+          <div className="text-right">
+            <span className="text-xs text-neutral-500 mr-2">Total</span>
+            <span className="font-semibold text-indigo-400">${order.paid_amount.toFixed(2)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -196,25 +203,25 @@ function OrderCard({ order }: { order: Order }) {
 
 function ProductCard({ data }: { data: ProductData }) {
   const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    processing: "bg-blue-100 text-blue-800",
-    shipped: "bg-indigo-100 text-indigo-800",
-    delivered: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
+    pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    processing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    shipped: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    delivered: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
   };
 
-  const statusClass = statusColors[data.status.toLowerCase()] || "bg-gray-100 text-gray-800";
+  const statusClass = statusColors[data.status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+    <div className="bg-neutral-900/50 backdrop-blur-sm rounded-xl border border-white/10 shadow-lg overflow-hidden ring-1 ring-white/5">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-neutral-100">
+      <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-4 py-3 border-b border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-purple-600" />
-            <span className="font-semibold text-neutral-900">Order #{data.order_id}</span>
+            <Package className="h-4 w-4 text-purple-400" />
+            <span className="font-medium text-neutral-200">Order #{data.order_id}</span>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
             {data.status}
           </span>
         </div>
@@ -223,37 +230,53 @@ function ProductCard({ data }: { data: ProductData }) {
       {/* Products List */}
       <div className="p-4 space-y-4">
         {data.items.map((item) => (
-          <div key={item.id} className="border-b border-neutral-100 pb-3 last:border-0 last:pb-0">
-            <div className="flex items-start justify-between">
+          <div key={item.id} className="border-b border-white/5 pb-4 last:border-0 last:pb-0">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="h-4 w-4 text-purple-500" />
-                  <span className="font-medium text-neutral-800">{item.name}</span>
-                  <span className="text-xs text-neutral-400">ID: {item.id}</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-6 w-6 rounded bg-neutral-800 flex items-center justify-center">
+                    <ShoppingBag className="h-3 w-3 text-purple-400" />
+                  </div>
+                  <span className="font-medium text-white">{item.name}</span>
                 </div>
-                <p className="text-sm text-neutral-500 mt-1 ml-6">{item.description}</p>
-                <div className="flex items-center gap-4 mt-2 ml-6 text-xs text-neutral-500">
-                  <span>Qty: {item.quantity}</span>
-                  <span>Tax: {item.tax_percent}%</span>
+                <p className="text-xs text-neutral-500 ml-8 mb-2 leading-relaxed">{item.description}</p>
+
+                <div className="flex flex-wrap items-center gap-3 ml-8 text-xs text-neutral-500">
+                  <div className="flex items-center gap-1 bg-neutral-800/50 px-2 py-1 rounded">
+                    <span>Qty:</span>
+                    <span className="text-neutral-300">{item.quantity}</span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-neutral-800/50 px-2 py-1 rounded">
+                    <span>Tax:</span>
+                    <span className="text-neutral-300">{item.tax_percent}%</span>
+                  </div>
                   {item.discounts.length > 0 && (
-                    <span className="text-green-600">🏷️ {item.discounts.join(", ")}</span>
+                    <span className="text-green-400 bg-green-500/10 px-2 py-1 rounded border border-green-500/10">
+                      🏷️ {item.discounts.join(", ")}
+                    </span>
                   )}
                 </div>
               </div>
-              <span className="font-semibold text-neutral-700">${item.unit_price.toFixed(2)}</span>
+              <div className="text-right">
+                <span className="block font-semibold text-white">${item.unit_price.toFixed(2)}</span>
+                <span className="text-[10px] text-neutral-600">per unit</span>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Footer */}
-      <div className="bg-neutral-50 px-4 py-3 border-t border-neutral-100">
+      <div className="bg-white/5 px-4 py-3 border-t border-white/5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-neutral-500">
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
             <CreditCard className="h-3.5 w-3.5" />
             <span>{data.payment_method}</span>
           </div>
-          <span className="font-bold text-purple-600">${data.total_paid.toFixed(2)}</span>
+          <div className="text-right">
+            <span className="text-xs text-neutral-500 mr-2">Total Paid</span>
+            <span className="font-bold text-purple-400 text-lg">${data.total_paid.toFixed(2)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -468,36 +491,36 @@ export function AskAssistantDialog() {
           <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white/95 backdrop-blur-xl h-[600px] flex flex-col">
+      <DialogContent className="sm:max-w-[720px] max-h-[85vh] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-neutral-900 text-neutral-100 flex flex-col ring-1 ring-white/10">
 
         {/* Header */}
-        <DialogHeader className="relative overflow-hidden px-5 py-4 shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"></div>
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iNCIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+        <DialogHeader className="relative overflow-hidden px-5 py-4 shrink-0 border-b border-white/5">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/50 via-violet-900/50 to-purple-900/50"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iNCIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
 
           <div className="relative flex items-center gap-3">
             {selectedAgent ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white hover:bg-white/20 -ml-2"
+                className="h-8 w-8 text-neutral-400 hover:text-white hover:bg-white/10 -ml-2 rounded-full transition-colors"
                 onClick={() => setSelectedAgent(null)}
               >
                 <span className="sr-only">Back</span>
                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4"><path d="M8.84182 3.13514C9.04327 3.32401 9.05348 3.64042 8.86462 3.84188L5.43521 7.49991L8.86462 11.1579C9.05348 11.3594 9.04327 11.6758 8.84182 11.8647C8.64036 12.0535 8.32394 12.0433 8.13508 11.8419L4.38508 7.84188C4.20477 7.64955 4.20477 7.35027 4.38508 7.15794L8.13508 3.15794C8.32394 2.95648 8.64036 2.94628 8.84182 3.13514Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
               </Button>
             ) : (
-              <div className="h-11 w-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/20">
-                <Bot className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/10 shadow-lg">
+                <Bot className="h-5 w-5 text-indigo-300" />
               </div>
             )}
 
             <div>
-              <DialogTitle className="text-base font-semibold text-white flex items-center gap-2">
+              <DialogTitle className="text-base font-medium text-white flex items-center gap-2">
                 {selectedAgent ? agents.find(a => a.id === selectedAgent)?.name : "AI Assistant"}
-                <Sparkles className="h-4 w-4 text-amber-300" />
+                <Sparkles className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
               </DialogTitle>
-              <DialogDescription className="text-xs text-white/70">
+              <DialogDescription className="text-xs text-indigo-200/70">
                 {selectedAgent ? "Always online" : "Select an agent to help you"}
               </DialogDescription>
             </div>
@@ -507,11 +530,11 @@ export function AskAssistantDialog() {
         {/* CONTENT */}
         {!selectedAgent ? (
           /* AGENT SELECTION SCREEN */
-          <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-neutral-50 to-white">
+          <div className="flex-1 overflow-y-auto p-6 bg-neutral-900 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-800 via-neutral-900 to-neutral-900">
             <div className="space-y-6">
               <div className="text-center space-y-2 mb-8">
-                <h3 className="text-xl font-bold text-neutral-900">How can we help you?</h3>
-                <p className="text-neutral-500 text-sm">Choose a specialized agent for your needs</p>
+                <h3 className="text-xl font-medium text-white">How can we help you?</h3>
+                <p className="text-neutral-400 text-sm">Choose a specialized agent for your needs</p>
               </div>
 
               <div className="grid gap-4">
@@ -519,14 +542,14 @@ export function AskAssistantDialog() {
                   <button
                     key={agent.id}
                     onClick={() => setSelectedAgent(agent.id)}
-                    className="flex items-start gap-4 p-4 rounded-2xl bg-white border border-neutral-200 shadow-sm hover:shadow-md hover:border-indigo-300 hover:scale-[1.02] transition-all text-left group"
+                    className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-indigo-500/30 transition-all text-left group hover:shadow-lg hover:shadow-indigo-500/10"
                   >
-                    <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${agent.color} flex items-center justify-center shadow-lg shrink-0 group-hover:scale-110 transition-transform`}>
+                    <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${agent.color} flex items-center justify-center shadow-lg shrink-0 group-hover:scale-110 transition-transform opacity-90 group-hover:opacity-100`}>
                       <agent.icon className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-neutral-900 mb-1">{agent.name}</h4>
-                      <p className="text-sm text-neutral-500 leading-relaxed">{agent.description}</p>
+                      <h4 className="font-medium text-neutral-200 mb-1 group-hover:text-white transition-colors">{agent.name}</h4>
+                      <p className="text-sm text-neutral-400 leading-relaxed group-hover:text-neutral-300 transition-colors">{agent.description}</p>
                     </div>
                   </button>
                 ))}
@@ -535,13 +558,13 @@ export function AskAssistantDialog() {
           </div>
         ) : (
           /* CHAT SCREEN */
-          <div className="flex flex-col flex-1 overflow-hidden bg-gradient-to-b from-neutral-50 to-white relative">
+          <div className="flex flex-col flex-1 overflow-hidden bg-neutral-900 relative">
             <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-5">
                   <div className="relative">
-                    <div className={`h-20 w-20 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-lg opacity-20`}></div>
-                    <div className={`absolute inset-0 h-20 w-20 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-lg scale-90`}>
+                    <div className={`h-24 w-24 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-2xl opacity-10 blur-xl`}></div>
+                    <div className={`absolute inset-0 h-24 w-24 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-inner ring-1 ring-white/10 opacity-90`}>
                       {(() => {
                         const Icon = agents.find(a => a.id === selectedAgent)?.icon || Bot;
                         return <Icon className="h-10 w-10 text-white" />;
@@ -549,10 +572,10 @@ export function AskAssistantDialog() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-semibold text-lg text-neutral-900">
-                      Hello! I'm your {agents.find(a => a.id === selectedAgent)?.name}.
+                    <p className="font-medium text-lg text-white">
+                      Hello! I&apos;m your {agents.find(a => a.id === selectedAgent)?.name}.
                     </p>
-                    <p className="text-sm text-neutral-500 max-w-[260px] mx-auto leading-relaxed">
+                    <p className="text-sm text-neutral-400 max-w-[260px] mx-auto leading-relaxed">
                       {selectedAgent === "refund_agent"
                         ? "I can help you process returns, check eligibility, and track your refunds."
                         : "I'm here to assist you with your inquiries."}
@@ -566,14 +589,9 @@ export function AskAssistantDialog() {
                           key={text}
                           onClick={() => {
                             setInput(text);
-                            // We need to wait for state update in a real app, but here we can just call sendMessage with content
-                            // actually sendMessage requires input state if content not passed, but we can pass content.
-                            // But better to simulate typing:
-
-                            // For simplicity let's just trigger it immediately
                             sendMessage(text);
                           }}
-                          className="px-4 py-2 text-xs font-medium rounded-full bg-white border border-neutral-200 text-neutral-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm"
+                          className="px-4 py-2 text-xs font-medium rounded-full bg-white/5 border border-white/10 text-neutral-300 hover:border-indigo-500/50 hover:text-indigo-300 hover:bg-white/10 transition-all shadow-sm"
                         >
                           {text}
                         </button>
@@ -591,23 +609,23 @@ export function AskAssistantDialog() {
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {message.role === "assistant" && (
-                        <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200`}>
+                        <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-3 shrink-0 shadow-lg`}>
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
                       <div className={`max-w-[85%] ${message.role === "user" ? "" : "flex-1"}`}>
                         {/* Text content */}
                         <div
-                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === "user"
-                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-md whitespace-pre-wrap"
-                            : "bg-white border border-neutral-100 text-neutral-800 rounded-bl-md markdown-content"
+                          className={`rounded-2xl px-5 py-3.5 text-sm shadow-md ${message.role === "user"
+                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-sm"
+                            : "bg-neutral-800 border border-white/5 text-neutral-200 rounded-bl-sm markdown-content ring-1 ring-white/5"
                             }`}
                         >
                           {message.role === "assistant" ? (
                             message.content ? (
                               <ReactMarkdown>{message.content}</ReactMarkdown>
                             ) : (
-                              "..."
+                              <span className="animate-pulse">...</span>
                             )
                           ) : (
                             message.content
@@ -616,7 +634,7 @@ export function AskAssistantDialog() {
 
                         {/* Order Cards - for order list */}
                         {message.orders && message.orders.length > 0 && (
-                          <div className="mt-3 space-y-3">
+                          <div className="mt-4 space-y-4">
                             {message.orders.map((order) => (
                               <OrderCard key={order.id} order={order} />
                             ))}
@@ -625,7 +643,7 @@ export function AskAssistantDialog() {
 
                         {/* Product Card - for single order details */}
                         {message.productData && (
-                          <div className="mt-3">
+                          <div className="mt-4">
                             <ProductCard data={message.productData} />
                           </div>
                         )}
@@ -634,13 +652,13 @@ export function AskAssistantDialog() {
                   ))}
                   {loading && messages[messages.length - 1]?.role !== "assistant" && (
                     <div className="flex justify-start animate-in slide-in-from-bottom-2">
-                      <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-2 shrink-0 shadow-lg shadow-indigo-200`}>
+                      <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color || "from-violet-500 to-indigo-600"} flex items-center justify-center mr-3 shrink-0 shadow-lg`}>
                         <Bot className="h-4 w-4 text-white" />
                       </div>
-                      <div className="bg-white border border-neutral-100 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5 shadow-sm">
-                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></span>
+                      <div className="bg-neutral-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-4 flex items-center gap-1.5 shadow-sm ring-1 ring-white/5">
+                        <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce"></span>
                       </div>
                     </div>
                   )}
@@ -650,20 +668,20 @@ export function AskAssistantDialog() {
             </ScrollArea>
 
             {/* Input area */}
-            <div className="p-4 border-t border-neutral-100 bg-white/80 backdrop-blur-sm shrink-0">
+            <div className="p-4 border-t border-white/5 bg-neutral-900/90 backdrop-blur-md shrink-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   sendMessage();
                 }}
-                className="flex items-end gap-2"
+                className="flex items-end gap-3"
               >
-                <div className="flex-1 relative">
+                <div className="flex-1 relative group">
                   <Textarea
                     placeholder="Type your message..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="min-h-[48px] max-h-[120px] resize-none rounded-2xl border-neutral-200 bg-neutral-50 focus:bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-300 py-3 px-4 pr-12 transition-all [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    className="min-h-[52px] max-h-[120px] resize-none rounded-2xl border-white/10 bg-neutral-800/50 focus:bg-neutral-800 text-neutral-100 placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50 py-3.5 px-4 pr-12 transition-all [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] shadow-inner"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -691,7 +709,7 @@ export function AskAssistantDialog() {
                       setMessages([]);
                       setThreadId(null);
                     }}
-                    className="h-12 w-12 rounded-2xl border-neutral-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                    className="h-12 w-12 rounded-2xl border-white/10 bg-neutral-800 text-neutral-400 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all"
                     title="Clear chat"
                   >
                     <Trash2 className="h-5 w-5" />
@@ -701,9 +719,9 @@ export function AskAssistantDialog() {
                   type="submit"
                   size="icon"
                   disabled={loading || !input.trim()}
-                  className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none"
+                  className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none"
                 >
-                  <Send className="h-5 w-5" />
+                  <Send className="h-5 w-5 text-white" />
                 </Button>
               </form>
             </div>
