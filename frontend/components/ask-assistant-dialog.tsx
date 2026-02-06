@@ -141,7 +141,8 @@ function OrderCard({ order }: { order: Order }) {
     delivered: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   };
 
-  const statusClass = statusColors[order.status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
+  const status = order?.status ?? "Unknown";
+  const statusClass = statusColors[status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
 
   return (
     <div className="bg-neutral-900/50 backdrop-blur-sm rounded-xl border border-white/5 shadow-inner overflow-hidden hover:border-indigo-500/30 transition-all group">
@@ -150,28 +151,28 @@ function OrderCard({ order }: { order: Order }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-indigo-400" />
-            <span className="font-medium text-neutral-200">Order #{order.id}</span>
+            <span className="font-medium text-neutral-200">Order #{order?.id ?? "N/A"}</span>
           </div>
           <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
-            {order.status}
+            {status}
           </span>
         </div>
       </div>
 
       {/* Card Body - Items List */}
       <div className="p-4 space-y-3">
-        {order.items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between text-sm">
+        {(order?.items ?? []).map((item, idx) => (
+          <div key={item?.id ?? idx} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
                 <ShoppingBag className="h-4 w-4 text-neutral-500" />
               </div>
               <div>
-                <span className="block text-neutral-300 font-medium">{item.name}</span>
-                <span className="text-xs text-neutral-500">Qty: {item.quantity}</span>
+                <span className="block text-neutral-300 font-medium">{item?.name ?? "Unknown Item"}</span>
+                <span className="text-xs text-neutral-500">Qty: {item?.quantity ?? 0}</span>
               </div>
             </div>
-            <span className="text-neutral-400 font-mono">${item.price.toFixed(2)}</span>
+            <span className="text-neutral-400 font-mono">${(item?.price ?? 0).toFixed(2)}</span>
           </div>
         ))}
       </div>
@@ -181,11 +182,11 @@ function OrderCard({ order }: { order: Order }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-neutral-500">
             <CreditCard className="h-3.5 w-3.5" />
-            <span>{order.payment_method}</span>
+            <span>{order?.payment_method ?? "Unknown"}</span>
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total</span>
-            <span className="font-semibold text-indigo-400">${order.paid_amount.toFixed(2)}</span>
+            <span className="font-semibold text-indigo-400">${(order?.paid_amount ?? 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -210,7 +211,8 @@ function ProductCard({ data }: { data: ProductData }) {
     cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
   };
 
-  const statusClass = statusColors[data.status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
+  const status = data?.status ?? "Unknown";
+  const statusClass = statusColors[status.toLowerCase()] || "bg-neutral-800 text-neutral-400 border-neutral-700";
 
   return (
     <div className="bg-neutral-900/50 backdrop-blur-sm rounded-xl border border-white/10 shadow-lg overflow-hidden ring-1 ring-white/5">
@@ -219,46 +221,46 @@ function ProductCard({ data }: { data: ProductData }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-purple-400" />
-            <span className="font-medium text-neutral-200">Order #{data.order_id}</span>
+            <span className="font-medium text-neutral-200">Order #{data?.order_id ?? "N/A"}</span>
           </div>
           <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
-            {data.status}
+            {status}
           </span>
         </div>
       </div>
 
       {/* Products List */}
       <div className="p-4 space-y-4">
-        {data.items.map((item) => (
-          <div key={item.id} className="border-b border-white/5 pb-4 last:border-0 last:pb-0">
+        {(data?.items ?? []).map((item, idx) => (
+          <div key={item?.id ?? idx} className="border-b border-white/5 pb-4 last:border-0 last:pb-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="h-6 w-6 rounded bg-neutral-800 flex items-center justify-center">
                     <ShoppingBag className="h-3 w-3 text-purple-400" />
                   </div>
-                  <span className="font-medium text-white">{item.name}</span>
+                  <span className="font-medium text-white">{item?.name ?? "Unknown Item"}</span>
                 </div>
-                <p className="text-xs text-neutral-500 ml-8 mb-2 leading-relaxed">{item.description}</p>
+                <p className="text-xs text-neutral-500 ml-8 mb-2 leading-relaxed">{item?.description ?? "No description"}</p>
 
                 <div className="flex flex-wrap items-center gap-3 ml-8 text-xs text-neutral-500">
                   <div className="flex items-center gap-1 bg-neutral-800/50 px-2 py-1 rounded">
                     <span>Qty:</span>
-                    <span className="text-neutral-300">{item.quantity}</span>
+                    <span className="text-neutral-300">{item?.quantity ?? 0}</span>
                   </div>
                   <div className="flex items-center gap-1 bg-neutral-800/50 px-2 py-1 rounded">
                     <span>Tax:</span>
-                    <span className="text-neutral-300">{item.tax_percent}%</span>
+                    <span className="text-neutral-300">{item?.tax_percent ?? 0}%</span>
                   </div>
-                  {item.discounts.length > 0 && (
+                  {(item?.discounts ?? []).length > 0 && (
                     <span className="text-green-400 bg-green-500/10 px-2 py-1 rounded border border-green-500/10">
-                      🏷️ {item.discounts.join(", ")}
+                      🏷️ {(item?.discounts ?? []).join(", ")}
                     </span>
                   )}
                 </div>
               </div>
               <div className="text-right">
-                <span className="block font-semibold text-white">${item.unit_price.toFixed(2)}</span>
+                <span className="block font-semibold text-white">${(item?.unit_price ?? 0).toFixed(2)}</span>
                 <span className="text-[10px] text-neutral-600">per unit</span>
               </div>
             </div>
@@ -271,11 +273,11 @@ function ProductCard({ data }: { data: ProductData }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-neutral-500">
             <CreditCard className="h-3.5 w-3.5" />
-            <span>{data.payment_method}</span>
+            <span>{data?.payment_method ?? "Unknown"}</span>
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total Paid</span>
-            <span className="font-bold text-purple-400 text-lg">${data.total_paid.toFixed(2)}</span>
+            <span className="font-bold text-purple-400 text-lg">${(data?.total_paid ?? 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -377,55 +379,57 @@ export function AskAssistantDialog() {
                 continue;
               }
 
-              // Parse node updates from LangGraph
-              for (const key of Object.keys(chunkData)) {
-                const nodeData = chunkData[key];
-                if (nodeData?.messages && Array.isArray(nodeData.messages)) {
-
-                  // Check ALL messages for ORDER_DATA or PRODUCT_DATA (from tool responses)
-                  for (const msg of nodeData.messages) {
-                    const msgContent = msg.content || "";
-
-                    // Check for ORDER_DATA (list of orders)
-                    if (msgContent.includes("<!--ORDER_DATA:")) {
-                      const { orders } = parseOrderData(msgContent);
-                      if (orders) {
-                        setMessages(prev => prev.map(m =>
-                          m.id === assistantMessageId
-                            ? { ...m, orders }
-                            : m
-                        ));
+              // Handle the new streaming format: {"type": "message", "content": "..."}
+              if (chunkData.type === "message" && chunkData.content) {
+                const content = chunkData.content;
+                
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  
+                  if (lastMsg && lastMsg.role === "assistant" && lastMsg.id === assistantMessageId) {
+                    // Check for ORDERS tag
+                    const ordersMatch = content.match(/<ORDERS>([\s\S]*?)<\/ORDERS>/);
+                    if (ordersMatch) {
+                      try {
+                        const parsed = JSON.parse(ordersMatch[1]);
+                        // Backend returns {"orders": [...]} so extract the array
+                        lastMsg.orders = parsed.orders || parsed;
+                        lastMsg.content = content.replace(/<ORDERS>[\s\S]*?<\/ORDERS>/, "").trim();
+                      } catch (e) {
+                        lastMsg.content = content;
                       }
                     }
-
-                    // Check for PRODUCT_DATA (single order details)
-                    if (msgContent.includes("<!--PRODUCT_DATA:")) {
-                      const { productData } = parseProductData(msgContent);
-                      if (productData) {
-                        setMessages(prev => prev.map(m =>
-                          m.id === assistantMessageId
-                            ? { ...m, productData }
-                            : m
-                        ));
+                    // Check for ORDER tag
+                    else if (content.match(/<ORDER>([\s\S]*?)<\/ORDER>/)) {
+                      const orderMatch = content.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
+                      try {
+                        const parsed = JSON.parse(orderMatch![1]);
+                        // Backend returns {"order": {...}} so extract the object
+                        lastMsg.productData = parsed.order || parsed;
+                        lastMsg.content = content.replace(/<ORDER>[\s\S]*?<\/ORDER>/, "").trim();
+                      } catch (e) {
+                        lastMsg.content = content;
                       }
                     }
+                    // No structured data, just replace content
+                    else {
+                      lastMsg.content = content;
+                    }
                   }
-
-                  // Get the AI message for the text content
-                  const aiMessages = nodeData.messages.filter(
-                    (m: { type?: string }) => m.type === "ai" || m.type === "AIMessage"
-                  );
-                  if (aiMessages.length > 0) {
-                    const lastAiMsg = aiMessages[aiMessages.length - 1];
-                    const content = lastAiMsg.content || "";
-
-                    setMessages(prev => prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: content }
-                        : msg
-                    ));
-                  }
-                }
+                  
+                  return updated;
+                });
+              } else if (chunkData.type === "error") {
+                console.error("Error from backend:", chunkData.content);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: (Date.now() + 2).toString(),
+                    role: "assistant",
+                    content: "An error occurred: " + chunkData.content,
+                  },
+                ]);
               }
             } catch (e) {
               console.error("Error parsing JSON chunk", e);
@@ -450,7 +454,7 @@ export function AskAssistantDialog() {
   const agents = [
     {
       id: "refund_agent",
-      name: "Refund Agent",
+      name: "Refunds",
       description: "Process returns, refunds, and replacements for your orders.",
       icon: Sparkles,
       color: "from-violet-500 to-indigo-600",
@@ -459,7 +463,7 @@ export function AskAssistantDialog() {
     },
     {
       id: "order_agent",
-      name: "Order Agent",
+      name: "Orders",
       description: "Track shipments, view order history, and manage deliveries.",
       icon: Package,
       color: "from-emerald-400 to-teal-500",
@@ -491,7 +495,7 @@ export function AskAssistantDialog() {
           <span className="sr-only">Open assistant</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[720px] max-h-[85vh] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-neutral-900 text-neutral-100 flex flex-col ring-1 ring-white/10">
+      <DialogContent className="sm:max-w-[720px] h-[85vh] p-0 gap-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-neutral-900 text-neutral-100 flex flex-col ring-1 ring-white/10">
 
         {/* Header */}
         <DialogHeader className="relative overflow-hidden px-5 py-4 shrink-0 border-b border-white/5">
@@ -541,7 +545,9 @@ export function AskAssistantDialog() {
                 {agents.map((agent) => (
                   <button
                     key={agent.id}
-                    onClick={() => setSelectedAgent(agent.id)}
+                    onClick={() => {
+                      if(agent.id === "refund_agent") setSelectedAgent(agent.id)
+                    }}
                     className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-indigo-500/30 transition-all text-left group hover:shadow-lg hover:shadow-indigo-500/10"
                   >
                     <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${agent.color} flex items-center justify-center shadow-lg shrink-0 group-hover:scale-110 transition-transform opacity-90 group-hover:opacity-100`}>
@@ -559,9 +565,9 @@ export function AskAssistantDialog() {
         ) : (
           /* CHAT SCREEN */
           <div className="flex flex-col flex-1 overflow-hidden bg-neutral-900 relative">
-            <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <ScrollArea className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-5">
+                <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 space-y-5">
                   <div className="relative">
                     <div className={`h-24 w-24 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-2xl opacity-10 blur-xl`}></div>
                     <div className={`absolute inset-0 h-24 w-24 rounded-3xl bg-gradient-to-br ${agents.find(a => a.id === selectedAgent)?.color} flex items-center justify-center shadow-inner ring-1 ring-white/10 opacity-90`}>
@@ -635,8 +641,8 @@ export function AskAssistantDialog() {
                         {/* Order Cards - for order list */}
                         {message.orders && message.orders.length > 0 && (
                           <div className="mt-4 space-y-4">
-                            {message.orders.map((order) => (
-                              <OrderCard key={order.id} order={order} />
+                            {message.orders.map((order, i) => (
+                              <OrderCard key={i} order={order} />
                             ))}
                           </div>
                         )}

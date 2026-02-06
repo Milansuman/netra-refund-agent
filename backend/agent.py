@@ -1,427 +1,329 @@
-"""
-REFUND AGENT WITH TOOLS
-========================
-
-This agent can:
-1. Have conversations about refunds
-2. CALL TOOLS to perform actions (like fetching orders)
-
-KEY CONCEPT: Tools
-------------------
-A "tool" is a function the LLM can decide to call. Think of it like giving
-the AI assistant access to your phone - it can make calls when needed.
-
-The LLM sees:
-- Tool name: "get_user_orders"
-- Tool description: "Fetch all orders for the current user"
-- Tool parameters: None (we handle user_id internally for security)
-
-When user says "list my orders", the LLM thinks:
-"I should call get_user_orders to get this information"
-"""
-
+import os
+from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
-from langchain.messages import (
-    AnyMessage,
-    HumanMessage,
-    SystemMessage,
-    AIMessage,
-    ToolMessage,
-)
+from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langchain_litellm import ChatLiteLLM
-
-from typing import TypedDict, Annotated, Literal
-from dotenv import load_dotenv
-import operator
-import os
-from models import refunds
+from langchain.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage
+from typing import TypedDict, Any
 import json
-from pydantic import BaseModel
 from db import db
+from tools import RefundAgentTools
+import tiktoken
+from rich import print
+from models import refunds
 from datetime import date
-from tools import create_get_orders_tool, create_check_stock_tool, create_get_general_terms_tool, create_get_policy_tool, create_process_refund_tool, create_raise_ticket_tool, create_search_orders_by_product_tool, create_check_eligibility_tool
 
 load_dotenv()
 
-# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# if not GROQ_API_KEY:
-#     raise ValueError("GROQ_API_KEY not set")
-
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-if not LITELLM_API_KEY:
-    raise ValueError("LITELLM_API_KEY not set")
 
+_agent_llm = None
+_summarizer_llm = None
 
-# =============================================================================
-# STATE DEFINITION
-# =============================================================================
-#
-# The "state" is like the agent's memory. It holds:
-# - messages: The conversation history
-# - user_id: Who is talking (so tools know whose orders to fetch)
-# - refund: The final refund classification (if determined)
-#
-# The `Annotated[list, operator.add]` means: when updating messages,
-# ADD new messages to the existing list (don't replace them)
-# =============================================================================
+if GROQ_API_KEY:
+    _agent_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+    _summarizer_llm = ChatGroq(api_key=GROQ_API_KEY, model="groq/compound") #type: ignore
+elif LITELLM_API_KEY:
+    _agent_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4o")
+    _summarizer_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4-turbo")
+else:
+    raise ValueError("LITELLM_API_KEY or GROQ_API_KEY not set")
 
+# Get tool schemas by creating a temporary instance
+# We'll use the actual user_id when executing in tool_node
+temp_tools_dict = RefundAgentTools(user_id=0).get_tools()
+temp_tools = list(temp_tools_dict.values())
+_agent_llm = _agent_llm.bind_tools(temp_tools) #type: ignore
 
 class RefundAgentState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]  # Append-only message list
-    user_id: int  # The logged-in user's ID
-    refund: dict | None
-    is_complete: bool
-    # Refund processing state
-    selected_order_ids: list[int] | None  # Orders user wants to process
-    selected_items: dict | None  # {order_item_id: quantity}
-    refund_details: dict | None  # Collected refund information
-    evidence_required: bool  # Whether evidence is needed
-    eligibility_checked: bool  # Whether eligibility was verified
-    wants_replacement: bool  # Whether user wants replacement instead of refund
-    replacement_available: bool  # Whether replacement product is in stock
-
-
-# =============================================================================
-# LLM SETUP
-# =============================================================================
-
-# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4o-mini")
-
-# =============================================================================
-# TOOLS
-# =============================================================================
-#
-# Tools are functions decorated with @tool. The decorator:
-# 1. Tells LangChain this is a tool
-# 2. Extracts the function's docstring as the tool description
-# 3. Extracts parameters from the function signature
-#
-# IMPORTANT: Tools receive the full state, so they can access user_id
-# =============================================================================
-
-
-class _RefundClassification(BaseModel):
-    refund_type: str
-    reason: str
-
-# =============================================================================
-# SYSTEM PROMPT
-# =============================================================================
+    messages: list[AnyMessage]
+    user_id: int
 
 SYSTEM_PROMPT = """
-You are a **refund support agent** responsible for helping users with their **orders, returns, replacements, and refunds**. Your role is to accurately identify orders, evaluate refund eligibility based on policy, and guide users through a smooth and transparent resolution process.
+You are a helpful customer service agent specialized in handling refunds and order inquiries.
 
-AVAILABLE TOOLS:
-1. **get_user_orders** - Fetch all orders for the current user. Use when user asks about their orders or order history.
-2. **get_order_details** - Get detailed information about a specific order including all products, dates, delivery status, and refund eligibility. Use when user asks about a specific order by ID or item.
-3. **search_orders_by_product** - Search for orders containing a specific product by name or keyword. Use when user mentions a product name but doesn't provide an order ID.
-4. **get_refund_policy** - Get the full policy text for a specific refund category (e.g., DAMAGED_ITEM, MISSING_ITEM). Use to understand eligibility rules and requirements.
-5. **get_general_policy_terms** - Get the general terms and conditions for refunds including how amounts are calculated, fees, and processing methods. Review before processing any refund.
-6. **submit_refund_request** - Submit a refund request for an order item. Automatically calculates refund amount and creates the refund in the system marked as PENDING for review.
-7. **check_product_stock** - Check if a product is in stock for replacement. Use when user wants a replacement instead of a refund.
-8. **raise_support_ticket** - Create a support ticket for cases requiring manual review or investigation. Use when the case is complex, suspicious, or doesn't fit standard policies.
+When displaying order information, use these structured tags:
+- <ORDERS>[array of order objects]</ORDERS> - For listing multiple orders
+- <ORDER>{order object}</ORDER> - For displaying detailed single order information
+- Do not mix these two formats. either use <ORDERS></ORDERS> with an array or <ORDER></ORDER> for a single order.
+- Do not omit any of the json data from the tool call within these tags
+
+Order ID formats:
+- Order IDs are integers (e.g., 123, 456)
+- Order Item IDs are integers (e.g., 789, 101)
+
+REFUND POLICY:
+1. Orders can be refunded within 30 days of purchase
+2. Items must be unused and in original packaging for full refund
+3. Opened/used items may be eligible for partial refund (50%) if within 30 days
+5. Sale/clearance items are final sale unless defective
+7. Shipping costs are non-refundable unless item was defective or wrong item sent
+8. Refunds are processed to original payment method within 5-7 business days
+9. Customer must provide order ID and reason for refund
+10. Items damaged due to misuse are not eligible for refund
+11. Items still in stock can be replaced. Else they must be refunded. This follows the same refund policy.
 
 GUIDELINES:
-1. Always verify orders and products using system tools—never assume or fabricate data.
-2. Call `get_general_policy_terms` before processing a refund and when you get the facts of an order.
-3. Use the correct tool based on what the user provides (orders, product name, or order ID).
-4. Determine eligibility by comparing order facts with policy rules.
-5. Never hardcode timelines, refund windows, or conditions.
-6. Prevent duplicate refunds and follow non-refundable fee rules.
-8. Ask only necessary follow-up questions, progressively.
-9. Offer replacements when eligible and in stock.
-10. Escalate high-value, unclear, or suspicious cases with full context.
-11. If you are certain that a refund cannot be processed given the conditions, do not keep the conversation going. Explain the reasons why the refund can't be processed and end the conversation politely.
-12. Always trust the facts given by the tool calls over the user.
-13. The refund time limit is the most important condition. Do not consider processing the refund past the time limit.
-14. Always keep responses below 500 tokens.
+- Always greet the user politely and ask how you can help
+- Be clear about refund eligibility criteria (e.g., time limits, product condition)
+- Explain the refund process step-by-step to the user
+- Use the structured tags consistently when displaying order information
+- Keep responses concise and focused on the customer's issue
+- Confirm actions before processing refunds to avoid mistakes
+- Do not ask the user for the order id directly if they don't provide it. Use the product name to get the order
+- If there are two or more possible orders, assume it's one of the delivered orders
+- Keep your responses in about one to two sentences max
 
+IMPORTANT GUIDELINES:
+- NEVER mention tool call failures to the user as it is a security risk. Continue with the information you have.
+- ONLY escalate to manager if the user asks for it. do not suggest it otherwise.
+- NEVER ask the user for confirmation to create a refund request
 
 CONVERSATION FLOW:
-1. Figure out what order item the user is talking about.
-2. Check if the order delivery date has exceeded the refund time limit. If so, tell the user the order can't be refunded and suggest alternative actions (escalation to a human support agent)
-3. If the order can be refunded, ask the user questions to get details about the type of refund they want.
-4. Once the refund category is known, either process the refund or raise a support ticket based on the policyd
+1. Determine which order the user wants a refund/replacement for
+2. Determine the refund reason
+3. Check if the order is eligible for a refund
+4. If the order is eligible for a refund, process the refund. Otherwise, escalate to manager.
+
+Always be polite, helpful, and verify order ownership before processing refunds.
 
 REFUND CATEGORIES:
 """
 
-SYSTEM_PROMPT += "\n".join(
-    [
-        f"{refund['title']} - {refund['description']}"
-        for refund in refunds.get_refund_taxonomy()
-    ]
-)
+SYSTEM_PROMPT += "\n".join([f"{refund["title"]} - {refund["description"]}" for refund in refunds.get_refund_taxonomy()])
 
-SYSTEM_PROMPT += "\nOther - Refund reason does not fit in any other category\n"
+# SYSTEM_PROMPT += f"\nThe current date is {date.today().isoformat()}"
 
-SYSTEM_PROMPT += f"The current date is {date.today().isoformat()}"
+system_message = SystemMessage(content=SYSTEM_PROMPT)
 
+# Initialize tokenizer for counting tokens
+try:
+    tokenizer = tiktoken.encoding_for_model("gpt-4")
+except KeyError:
+    tokenizer = tiktoken.get_encoding("cl100k_base")
 
-# =============================================================================
-# GRAPH NODES
-# =============================================================================
-#
-# A LangGraph graph has "nodes" (steps) and "edges" (connections).
-#
-# Our flow:
-#   START → chat_node → (if tool call) → tools_node → chat_node
-#                     → (if no tool call) → END
-# =============================================================================
-
+def count_tokens(messages: list[AnyMessage]) -> int:
+    """
+    Count the approximate number of tokens in the conversation history.
+    """
+    total_tokens = 0
+    for message in messages:
+        # Convert message content to string and count tokens
+        if hasattr(message, 'content') and message.content:
+            content = str(message.content)
+            total_tokens += len(tokenizer.encode(content))
+    return total_tokens
 
 def chat_node(state: RefundAgentState) -> dict:
-    """
-    The main chat node. This:
-    1. Gets the LLM's response to the conversation
-    2. The LLM might respond with text OR request a tool call
-    """
-    messages = state.get("messages", [])
-    user_id = state.get("user_id")
+    messages = state["messages"]
 
-    print(f"[DEBUG] chat_node called with user_id={user_id}")
-    print(
-        f"[DEBUG] Latest message: {messages[-1].content[:100] if messages else 'none'}"
-    )
+    response = _agent_llm.invoke(messages) #type: ignore
 
-    # Create all tools with the user's ID
-    get_orders_tool = create_get_orders_tool(user_id)
-    get_policy_tool = create_get_policy_tool(user_id)
-    get_general_terms_tool = create_get_general_terms_tool(user_id)
-    process_refund_tool = create_process_refund_tool(user_id)
-    escalate_to_manager = create_raise_ticket_tool(user_id)
-    check_stock_tool = create_check_stock_tool(user_id)
-    search_orders_tool = create_search_orders_by_product_tool(user_id)
-    eligibility_checker_tool = create_check_eligibility_tool(user_id)
-    
-    tools = [
-        get_orders_tool,
-        get_policy_tool,
-        get_general_terms_tool,
-        process_refund_tool,
-        escalate_to_manager,
-        check_stock_tool,
-        search_orders_tool,
-        eligibility_checker_tool
-    ]
-
-    # Bind tools to the LLM with explicit tool configuration
-    # tool_choice="auto" lets the LLM decide, but with clear instructions
-    llm_with_tools = _llm.bind_tools(tools, tool_choice="auto")
-
-    # Get response (might be text OR a tool call)
-    response = llm_with_tools.invoke(messages)
-
-    # Debug: Check if tool was called
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        print(f"[DEBUG] Tool calls: {response.tool_calls}")
-    else:
-        print(f"[DEBUG] No tool calls, response: {str(response.content)[:100]}")
-
-    # Check if conversation is complete (refund classified)
-    refund = None
-    is_complete = False
-    try:
-        refund = json.loads(str(response.content))
-        _RefundClassification(**refund)
-        is_complete = True
-    except:
-        pass
+    messages.append(response)
 
     return {
-        "messages": [response],  # Add to message history
-        "refund": refund,
-        "is_complete": is_complete,
+        "messages": messages
     }
 
+def summarizer_node(state: RefundAgentState) -> dict:
+    messages = state["messages"]
 
-def should_continue(state: RefundAgentState) -> Literal["tools", "__end__"]:
+    messages.append(HumanMessage(
+        content="Summarize this conversation into 6000 tokens or less"
+    ))
+
+    response = _summarizer_llm.invoke(messages) #type: ignore
+
+    print(response.content)
+
+    messages = [
+        system_message,
+        response
+    ]
+
+    return {
+        "messages": messages
+    }
+
+def tool_node(state: RefundAgentState) -> dict:
     """
-    Decide what to do next:
-    - If LLM requested a tool call → go to tools node
-    - Otherwise → end (we're done)
-
-    This is called a "conditional edge" in LangGraph.
+    Process tool calls from the last AI message and execute them.
+    Returns the tool results as ToolMessages.
     """
-    messages = state.get("messages", [])
-    last_message = messages[-1] if messages else None
-
-    # If the last message has tool_calls, we need to execute them
-    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls: #type: ignore
-        return "tools"
-
-    return "__end__"
-
-
-def tools_node(state: RefundAgentState) -> dict:
-    """
-    Execute any tool calls the LLM requested.
-
-    This node:
-    1. Gets the last message (which contains tool calls)
-    2. Executes each tool
-    3. Returns the results as ToolMessages
-    """
-    messages = state.get("messages", [])
-    user_id = state.get("user_id")
-    last_message = messages[-1]
-
-    # Create the tools with user context
-    get_orders_tool = create_get_orders_tool(user_id)
-    get_policy_tool = create_get_policy_tool(user_id)
-    get_general_terms_tool = create_get_general_terms_tool(user_id)
-    process_refund_tool = create_process_refund_tool(user_id)
-    raise_ticket_tool = create_raise_ticket_tool(user_id)
-    check_stock_tool = create_check_stock_tool(user_id)
-    search_orders_tool = create_search_orders_by_product_tool(user_id)
-    eligibility_checker_tool = create_check_eligibility_tool(user_id)
+    messages = state["messages"]
+    user_id = state["user_id"]
     
-    tools_by_name = {
-        "get_user_orders": get_orders_tool,
-        "get_refund_policy": get_policy_tool,
-        "get_general_policy_terms": get_general_terms_tool,
-        "submit_refund_request": process_refund_tool,
-        "raise_support_ticket": raise_ticket_tool,
-        "check_product_stock": check_stock_tool,
-        "search_orders_by_product": search_orders_tool,
-        # "eligibility_checker_tool": eligibility_checker_tool
-    }
-
+    last_message = messages[-1]
+    
+    if not isinstance(last_message, AIMessage) or not hasattr(last_message, 'tool_calls'):
+        return {"messages": messages}
+    
+    tool_calls = last_message.tool_calls
+    
+    if not tool_calls:
+        return {"messages": messages}
+    
+    # Get the actual tools with the real user_id
+    tools_by_name = RefundAgentTools(user_id).get_tools()
+    
     tool_messages = []
-    for tool_call in last_message.tool_calls: #type: ignore
-        tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
+    for tool_call in tool_calls:
+        tool_name = tool_call.get("name")
+        tool_args = tool_call.get("args", {})
+        tool_id = tool_call.get("id")
+        
+        try:
+            # Find and execute the tool
+            if tool_name in tools_by_name:
+                tool = tools_by_name[tool_name]
+                result = tool.invoke(tool_args)
+                
+                tool_messages.append(
+                    ToolMessage(
+                        content=result,
+                        tool_call_id=tool_id
+                    )
+                )
+            else:
+                tool_messages.append(
+                    ToolMessage(
+                        content=json.dumps({"error": f"Tool '{tool_name}' not found"}),
+                        tool_call_id=tool_id,
+                        status="error"
+                    )
+                )
+        except Exception as e:
+            tool_messages.append(
+                ToolMessage(
+                    content=json.dumps({"error": str(e)}),
+                    tool_call_id=tool_id,
+                    status="error"
+                )
+            )
+    
+    return {"messages": messages + tool_messages}
 
-        # Execute the tool
-        if tool_name in tools_by_name:
-            result = tools_by_name[tool_name].invoke(tool_args)
-        else:
-            result = f"Unknown tool: {tool_name}"
 
-        # Create a ToolMessage with the result
-        tool_messages.append(
-            ToolMessage(content=str(result), tool_call_id=tool_call["id"])
-        )
+def should_continue(state: RefundAgentState) -> str:
+    """
+    Determine whether to continue to tools, summarize, or end the conversation.
+    """
+    messages = state["messages"]
+    last_message = messages[-1]
+    
+    # Priority 1: If the last message has tool calls, route to tools
+    if isinstance(last_message, AIMessage) and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "tools"
+    
+    # Priority 2: Check if conversation exceeds 6000 tokens
+    token_count = count_tokens(messages)
+    if token_count > 6000:
+        return "summarizer"
+    
+    # Otherwise, end the conversation
+    return "end"
 
-    return {"messages": tool_messages}
 
-
-# =============================================================================
-# BUILD THE GRAPH
-# =============================================================================
-
-_builder = StateGraph(RefundAgentState)
+# Build the graph
+graph_builder = StateGraph(RefundAgentState)
 
 # Add nodes
-_builder.add_node("chat", chat_node)
-_builder.add_node("tools", tools_node)
+graph_builder.add_node("chat", chat_node)
+graph_builder.add_node("tools", tool_node)
+graph_builder.add_node("summarizer", summarizer_node)
 
 # Add edges
-_builder.add_edge(START, "chat")  # Start → chat
-_builder.add_conditional_edges(  # chat → (tools or end)
-    "chat", should_continue, {"tools": "tools", "__end__": END}
+graph_builder.add_edge(START, "chat")
+graph_builder.add_conditional_edges(
+    "chat",
+    should_continue,
+    {
+        "tools": "tools",
+        "summarizer": "summarizer",
+        "end": END
+    }
 )
-_builder.add_edge("tools", "chat")  # tools → chat (loop back)
+graph_builder.add_edge("tools", "chat")
+graph_builder.add_edge("summarizer", "chat")
 
-# Compile with checkpointer (for memory across messages)
-graph = _builder.compile(checkpointer=db.checkpointer)
-
-
-# =============================================================================
-# PUBLIC API
-# =============================================================================
-
-
-def clear_thread(thread_id: str) -> bool:
-    """
-    Clear all state for a specific thread/conversation.
-    
-    Parameters:
-    - thread_id: The thread ID to clear
-    
-    Returns:
-    - True if successful
-    """
-    try:
-        config = {"configurable": {"thread_id": thread_id}}
-        # LangGraph's checkpointer doesn't have a direct delete method,
-        # but we can update the state to empty
-        graph.update_state(config, { #type: ignore
-            "messages": [],
-            "user_id": 0,
-            "refund": None,
-            "is_complete": False,
-            "selected_order_ids": None,
-            "selected_items": None,
-            "refund_details": None,
-            "evidence_required": False,
-            "eligibility_checked": False,
-            "wants_replacement": False,
-            "replacement_available": False,
-        })
-        return True
-    except Exception as e:
-        print(f"Error clearing thread {thread_id}: {e}")
-        return False
+# Compile the graph with checkpointer
+graph = graph_builder.compile(checkpointer=db.checkpointer)
 
 
 def invoke_graph(
     thread_id: str,
     prompt: str,
-    user_id: int,
-    order_item_ids: list[str] | None = None,
+    user_id: int
 ):
     """
-    Invoke the agent with a user message.
-
-    Parameters:
-    - thread_id: Unique ID for this conversation (for memory)
-    - prompt: The user's message
-    - user_id: The logged-in user's ID (for fetching their orders)
+    Invoke the agent graph with streaming response.
+    
+    Args:
+        thread_id: Unique identifier for the conversation thread
+        prompt: User's input message
+        user_id: ID of the user making the request
+        order_item_ids: Optional list of order item IDs to process
+    
+    Yields:
+        JSON-encoded chunks of the agent's response
     """
-    if not order_item_ids:
-        order_item_ids = []
+    config: RunnableConfig = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": "",
+        }
+    }
 
-    config = {"configurable": {"thread_id": thread_id}}
+    agent_state = graph.get_state(config) #type: ignore
 
-    # Get existing messages from checkpoint
+    if not agent_state.values or not agent_state.values.get("messages"):
+        messages = [system_message, HumanMessage(content=prompt)]
+    else:
+        messages = agent_state.values["messages"] + [HumanMessage(content=prompt)]
+
+    updated_state: RefundAgentState = {
+        "messages": messages,
+        "user_id": user_id,
+    }
+    
     try:
-        state_snapshot = graph.get_state(config) #type: ignore
-        existing_messages = (
-            state_snapshot.values.get("messages", []) if state_snapshot.values else []
+        for chunk in graph.stream(updated_state, config=config, stream_mode="updates"): #type: ignore
+            if "chat" in chunk and len(chunk["chat"]["messages"][-1].content) > 0:
+                yield json.dumps({
+                    "type": "message",
+                    "content": chunk["chat"]["messages"][-1].content
+                })
+    except Exception as e:
+        print(e)
+        yield json.dumps({
+            "type": "error",
+            "content": str(e)
+        }) + "\n"
+
+
+def clear_thread(thread_id: str) -> bool:
+    """
+    Clear all state associated with a conversation thread.
+    
+    Args:
+        thread_id: The thread ID to clear
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Delete all checkpoints for this thread
+        # Note: PostgresSaver doesn't have a direct delete method,
+        # so we'll need to use the underlying connection
+        db.execute(
+            "DELETE FROM checkpoints WHERE thread_id = %s",
+            (thread_id,)
         )
-    except:
-        existing_messages = []
+        
+        return True
+    except Exception as e:
+        print(f"Error clearing thread {thread_id}: {e}")
+        return False
 
-    # Add system message if new conversation
-    if not existing_messages:
-        existing_messages = [SystemMessage(content=SYSTEM_PROMPT)]
-
-    # Add the new user message
-    existing_messages.append(HumanMessage(content=prompt)) #type: ignore
-
-    # Run the graph
-    for chunk in graph.stream(
-        { #type: ignore
-            "messages": existing_messages,
-            "user_id": user_id,
-            "refund": None,
-            "is_complete": False,
-            "selected_order_ids": None,
-            "selected_items": None,
-            "refund_details": None,
-            "evidence_required": False,
-            "eligibility_checked": False,
-            "wants_replacement": False,
-            "replacement_available": False,
-        },
-        config=config, #type: ignore
-        stream_mode="updates",
-    ):
-        json_chunk = json.dumps(
-            chunk, default=lambda o: o.dict() if hasattr(o, "dict") else str(o)
-        )
-        yield json_chunk + "\n"
