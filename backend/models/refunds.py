@@ -181,6 +181,7 @@ def create_refund(
     reason: str,
     amount: int,
     evidence: str | None = None,
+    status: str | None = "PENDING",
     quantity: int | None = None
 ) -> int:
     """Create a refund record in the database"""
@@ -194,7 +195,7 @@ def create_refund(
            (order_item_id, refund_taxonomy_id, reason, status, amount, evidence)
            values (%s, %s, %s, %s, %s, %s)
            returning id;""",
-        (order_item_id, taxonomy_id, reason, 'PENDING', amount, evidence)
+        (order_item_id, taxonomy_id, reason, status, amount, evidence)
     )
     
     return result[0][0]

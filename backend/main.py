@@ -61,6 +61,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+with open(".progress", "w") as f:
+    f.write("True")
 
 @app.get("/healthcheck")
 def healthcheck():
@@ -182,6 +184,8 @@ def clear_chat(
     """
     try:
         success = clear_thread(thread_id)
+        with open(".progress", "w") as f:
+            f.write("False")
         if success:
             return {"message": "Thread cleared successfully"}
         else:

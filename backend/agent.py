@@ -36,21 +36,22 @@ from typing import TypedDict, Annotated, Literal
 from dotenv import load_dotenv
 import operator
 import os
-from models import refunds, orders, policies, tickets, products
+from models import refunds
 import json
 from pydantic import BaseModel
 from db import db
-from tools import create_get_orders_tool, create_calculate_refund_tool, create_check_stock_tool, create_get_general_terms_tool, create_get_order_details_tool, create_get_order_facts_tool, create_get_policy_tool, create_process_refund_tool, create_raise_ticket_tool, create_search_orders_by_product_tool, create_validate_order_ids_tool
+from datetime import date
+from tools import create_get_orders_tool, create_check_stock_tool, create_get_general_terms_tool, create_get_policy_tool, create_process_refund_tool, create_raise_ticket_tool, create_search_orders_by_product_tool, create_check_eligibility_tool
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not set")
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# if not GROQ_API_KEY:
+#     raise ValueError("GROQ_API_KEY not set")
 
-# LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-# if not LITELLM_API_KEY:
-#     raise ValueError("LITELLM_API_KEY not set")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+if not LITELLM_API_KEY:
+    raise ValueError("LITELLM_API_KEY not set")
 
 
 # =============================================================================
@@ -86,8 +87,8 @@ class RefundAgentState(TypedDict):
 # LLM SETUP
 # =============================================================================
 
-_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
-# _llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4o")
+# _llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+_llm = ChatLiteLLM(api_base="https://llm.keyvalue.systems", api_key=LITELLM_API_KEY, model="litellm_proxy/gpt-4o-mini")
 
 # =============================================================================
 # TOOLS
@@ -113,20 +114,15 @@ class _RefundClassification(BaseModel):
 SYSTEM_PROMPT = """
 You are a **refund support agent** responsible for helping users with their **orders, returns, replacements, and refunds**. Your role is to accurately identify orders, evaluate refund eligibility based on policy, and guide users through a smooth and transparent resolution process.
 
-You must rely on **system tools and policies**, never assumptions. Always act in the user’s best interest while strictly following platform rules.
-
 AVAILABLE TOOLS:
 1. **get_user_orders** - Fetch all orders for the current user. Use when user asks about their orders or order history.
-2. **get_order_details** - Get detailed information about a specific order including all products. Use when user asks about a specific order by ID.
+2. **get_order_details** - Get detailed information about a specific order including all products, dates, delivery status, and refund eligibility. Use when user asks about a specific order by ID or item.
 3. **search_orders_by_product** - Search for orders containing a specific product by name or keyword. Use when user mentions a product name but doesn't provide an order ID.
-4. **validate_order_ids** - Validate order IDs provided by the user. Accepts multiple formats (comma-separated, space-separated, with # symbols, etc.).
-5. **get_refund_policy** - Get the full policy text for a specific refund category (e.g., DAMAGED_ITEM, MISSING_ITEM). Use to understand eligibility rules and requirements.
-6. **get_general_policy_terms** - Get the general terms and conditions for refunds including how amounts are calculated, fees, and processing methods. Review before processing any refund.
-7. **get_order_facts** - Get factual information about an order and item for refund eligibility assessment (order status, dates, delivery status, refund amount).
-8. **calculate_refund** - Calculate the exact refund amount for an order item including item price, tax, and deducting proportional discounts.
-9. **submit_refund_request** - Submit a refund request for an order item. Creates the refund in the system and marks it as PENDING for review.
-10. **check_product_stock** - Check if a product is in stock for replacement. Use when user wants a replacement instead of a refund.
-11. **raise_support_ticket** - Create a support ticket for cases requiring manual review or investigation. Use when the case is complex, suspicious, or doesn't fit standard policies.
+4. **get_refund_policy** - Get the full policy text for a specific refund category (e.g., DAMAGED_ITEM, MISSING_ITEM). Use to understand eligibility rules and requirements.
+5. **get_general_policy_terms** - Get the general terms and conditions for refunds including how amounts are calculated, fees, and processing methods. Review before processing any refund.
+6. **submit_refund_request** - Submit a refund request for an order item. Automatically calculates refund amount and creates the refund in the system marked as PENDING for review.
+7. **check_product_stock** - Check if a product is in stock for replacement. Use when user wants a replacement instead of a refund.
+8. **raise_support_ticket** - Create a support ticket for cases requiring manual review or investigation. Use when the case is complex, suspicious, or doesn't fit standard policies.
 
 GUIDELINES:
 1. Always verify orders and products using system tools—never assume or fabricate data.
@@ -140,6 +136,15 @@ GUIDELINES:
 10. Escalate high-value, unclear, or suspicious cases with full context.
 11. If you are certain that a refund cannot be processed given the conditions, do not keep the conversation going. Explain the reasons why the refund can't be processed and end the conversation politely.
 12. Always trust the facts given by the tool calls over the user.
+13. The refund time limit is the most important condition. Do not consider processing the refund past the time limit.
+14. Always keep responses below 500 tokens.
+
+
+CONVERSATION FLOW:
+1. Figure out what order item the user is talking about.
+2. Check if the order delivery date has exceeded the refund time limit. If so, tell the user the order can't be refunded and suggest alternative actions (escalation to a human support agent)
+3. If the order can be refunded, ask the user questions to get details about the type of refund they want.
+4. Once the refund category is known, either process the refund or raise a support ticket based on the policyd
 
 REFUND CATEGORIES:
 """
@@ -152,6 +157,8 @@ SYSTEM_PROMPT += "\n".join(
 )
 
 SYSTEM_PROMPT += "\nOther - Refund reason does not fit in any other category\n"
+
+SYSTEM_PROMPT += f"The current date is {date.today().isoformat()}"
 
 
 # =============================================================================
@@ -182,29 +189,23 @@ def chat_node(state: RefundAgentState) -> dict:
 
     # Create all tools with the user's ID
     get_orders_tool = create_get_orders_tool(user_id)
-    get_order_details_tool = create_get_order_details_tool(user_id)
-    validate_ids_tool = create_validate_order_ids_tool(user_id)
     get_policy_tool = create_get_policy_tool(user_id)
     get_general_terms_tool = create_get_general_terms_tool(user_id)
-    get_order_facts_tool = create_get_order_facts_tool(user_id)
-    calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
-    raise_ticket_tool = create_raise_ticket_tool(user_id)
+    escalate_to_manager = create_raise_ticket_tool(user_id)
     check_stock_tool = create_check_stock_tool(user_id)
     search_orders_tool = create_search_orders_by_product_tool(user_id)
+    eligibility_checker_tool = create_check_eligibility_tool(user_id)
     
     tools = [
         get_orders_tool,
-        get_order_details_tool,
-        validate_ids_tool,
         get_policy_tool,
         get_general_terms_tool,
-        get_order_facts_tool,
-        calculate_refund_tool,
         process_refund_tool,
-        raise_ticket_tool,
+        escalate_to_manager,
         check_stock_tool,
-        search_orders_tool
+        search_orders_tool,
+        eligibility_checker_tool
     ]
 
     # Bind tools to the LLM with explicit tool configuration
@@ -270,29 +271,23 @@ def tools_node(state: RefundAgentState) -> dict:
 
     # Create the tools with user context
     get_orders_tool = create_get_orders_tool(user_id)
-    get_order_details_tool = create_get_order_details_tool(user_id)
-    validate_ids_tool = create_validate_order_ids_tool(user_id)
     get_policy_tool = create_get_policy_tool(user_id)
     get_general_terms_tool = create_get_general_terms_tool(user_id)
-    get_order_facts_tool = create_get_order_facts_tool(user_id)
-    calculate_refund_tool = create_calculate_refund_tool(user_id)
     process_refund_tool = create_process_refund_tool(user_id)
     raise_ticket_tool = create_raise_ticket_tool(user_id)
     check_stock_tool = create_check_stock_tool(user_id)
     search_orders_tool = create_search_orders_by_product_tool(user_id)
+    eligibility_checker_tool = create_check_eligibility_tool(user_id)
     
     tools_by_name = {
         "get_user_orders": get_orders_tool,
-        "get_order_details": get_order_details_tool,
-        "validate_order_ids": validate_ids_tool,
         "get_refund_policy": get_policy_tool,
         "get_general_policy_terms": get_general_terms_tool,
-        "get_order_facts": get_order_facts_tool,
-        "calculate_refund": calculate_refund_tool,
         "submit_refund_request": process_refund_tool,
         "raise_support_ticket": raise_ticket_tool,
         "check_product_stock": check_stock_tool,
         "search_orders_by_product": search_orders_tool,
+        # "eligibility_checker_tool": eligibility_checker_tool
     }
 
     tool_messages = []

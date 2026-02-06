@@ -77,137 +77,137 @@ def create_get_orders_tool(user_id: int):
     return get_user_orders
 
 
-def create_get_order_details_tool(user_id: int):
-    """
-    Create a tool that fetches details of a specific order.
+# def create_get_order_details_tool(user_id: int):
+#     """
+#     Create a tool that fetches details of a specific order.
 
-    WHY do we need user_id?
-    -----------------------
-    For SECURITY! We verify the order belongs to the current user.
-    Otherwise, a user could request details of someone else's order.
-    """
+#     WHY do we need user_id?
+#     -----------------------
+#     For SECURITY! We verify the order belongs to the current user.
+#     Otherwise, a user could request details of someone else's order.
+#     """
 
-    @tool
-    def get_order_details(order_id: str | int) -> str:
-        """
-        Get detailed information about a specific order including all products.
-        Use this when the user asks about a specific order by ID, like
-        "show me order #1" or "what's in order 2".
+#     @tool
+#     def get_order_details(order_id: str | int) -> str:
+#         """
+#         Get detailed information about a specific order including all products.
+#         Use this when the user asks about a specific order by ID, like
+#         "show me order #1" or "what's in order 2".
 
-        Args:
-            order_id: The order ID to look up (e.g., 1, 2, 3)
-        """
-        try:
-            # Convert to int if string
-            order_id = int(order_id)
+#         Args:
+#             order_id: The order ID to look up (e.g., 1, 2, 3)
+#         """
+#         try:
+#             # Convert to int if string
+#             order_id = int(order_id)
             
-            # Fetch all orders for this user
-            user_orders = orders.get_user_orders(user_id)
+#             # Fetch all orders for this user
+#             user_orders = orders.get_user_orders(user_id)
 
-            # Find the specific order (and verify it belongs to this user!)
-            target_order = None
-            for order in user_orders:
-                if order["id"] == order_id:
-                    target_order = order
-                    break
+#             # Find the specific order (and verify it belongs to this user!)
+#             target_order = None
+#             for order in user_orders:
+#                 if order["id"] == order_id:
+#                     target_order = order
+#                     break
 
-            if not target_order:
-                return f"Order #{order_id} not found. Please check the order number and try again."
+#             if not target_order:
+#                 return f"Order #{order_id} not found. Please check the order number and try again."
 
-            # Create structured data for frontend to render as product cards
-            # Using <!--PRODUCT_DATA:...--> marker (similar to ORDER_DATA)
-            products_data = {
-                "order_id": target_order["id"],
-                "status": target_order["status"],
-                "payment_method": target_order["payment_method"],
-                "total_paid": target_order["paid_amount"] / 100,
-                "items": [],
-            }
+#             # Create structured data for frontend to render as product cards
+#             # Using <!--PRODUCT_DATA:...--> marker (similar to ORDER_DATA)
+#             products_data = {
+#                 "order_id": target_order["id"],
+#                 "status": target_order["status"],
+#                 "payment_method": target_order["payment_method"],
+#                 "total_paid": target_order["paid_amount"] / 100,
+#                 "items": [],
+#             }
 
-            for item in target_order["order_items"]:
-                product = item["product"]
-                item_data = {
-                    "id": item["id"],
-                    "name": product["title"],
-                    "description": product["description"] or "N/A",
-                    "quantity": item["quantity"],
-                    "unit_price": item["unit_price"] / 100,
-                    "tax_percent": item["tax_percent"],
-                    "discounts": [],
-                }
+#             for item in target_order["order_items"]:
+#                 product = item["product"]
+#                 item_data = {
+#                     "id": item["id"],
+#                     "name": product["title"],
+#                     "description": product["description"] or "N/A",
+#                     "quantity": item["quantity"],
+#                     "unit_price": item["unit_price"] / 100,
+#                     "tax_percent": item["tax_percent"],
+#                     "discounts": [],
+#                 }
 
-                # Add discount info
-                for discount in item.get("discounts", []):
-                    if discount.get("percent"):
-                        item_data["discounts"].append(
-                            f"{discount['code']} ({discount['percent']}% off)"
-                        )
-                    elif discount.get("amount") and discount["amount"]:
-                        item_data["discounts"].append(
-                            f"{discount['code']} (${discount['amount']/100:.2f} off)"
-                        )
+#                 # Add discount info
+#                 for discount in item.get("discounts", []):
+#                     if discount.get("percent"):
+#                         item_data["discounts"].append(
+#                             f"{discount['code']} ({discount['percent']}% off)"
+#                         )
+#                     elif discount.get("amount") and discount["amount"]:
+#                         item_data["discounts"].append(
+#                             f"{discount['code']} (${discount['amount']/100:.2f} off)"
+#                         )
 
-                products_data["items"].append(item_data)
+#                 products_data["items"].append(item_data)
 
-            # Return structured data for frontend AND text for LLM
-            result = f"<!--PRODUCT_DATA:{json.dumps(products_data)}-->\n\n"
-            result += f"**Order #{target_order['id']}** - {target_order['status']}\n"
-            result += f"Total: ${target_order['paid_amount']/100:.2f}\n\n"
-            result += "Products:\n"
-            for item in target_order["order_items"]:
-                result += f"• {item['product']['title']} (Item ID: {item['id']}) - ${item['unit_price']/100:.2f} x{item['quantity']}\n"
+#             # Return structured data for frontend AND text for LLM
+#             result = f"<!--PRODUCT_DATA:{json.dumps(products_data)}-->\n\n"
+#             result += f"**Order #{target_order['id']}** - {target_order['status']}\n"
+#             result += f"Total: ${target_order['paid_amount']/100:.2f}\n\n"
+#             result += "Products:\n"
+#             for item in target_order["order_items"]:
+#                 result += f"• {item['product']['title']} (Item ID: {item['id']}) - ${item['unit_price']/100:.2f} x{item['quantity']}\n"
 
-            result += "\nWould you like to request a refund for any of these items?"
-            return result
+#             result += "\nWould you like to request a refund for any of these items?"
+#             return result
 
-        except Exception as e:
-            return f"Sorry, I couldn't fetch order details: {str(e)}"
+#         except Exception as e:
+#             return f"Sorry, I couldn't fetch order details: {str(e)}"
 
-    return get_order_details
+#     return get_order_details
 
 
-def create_validate_order_ids_tool(user_id: int):
-    """Tool to validate and parse order IDs from user input"""
+# def create_validate_order_ids_tool(user_id: int):
+#     """Tool to validate and parse order IDs from user input"""
     
-    @tool
-    def validate_order_ids(order_ids: str) -> str:
-        """
-        Validate order IDs provided by the user. Accepts multiple formats:
-        - Single ID: "123"
-        - Comma-separated: "123, 456, 789"
-        - Space-separated: "123 456 789"
-        - With # symbols: "#123, #456"
-        - Pasted list with newlines
+#     @tool
+#     def validate_order_ids(order_ids: str) -> str:
+#         """
+#         Validate order IDs provided by the user. Accepts multiple formats:
+#         - Single ID: "123"
+#         - Comma-separated: "123, 456, 789"
+#         - Space-separated: "123 456 789"
+#         - With # symbols: "#123, #456"
+#         - Pasted list with newlines
         
-        Returns which orders are valid and belong to the user.
+#         Returns which orders are valid and belong to the user.
         
-        Args:
-            order_ids: The order IDs to validate (any format)
-        """
-        try:
-            result = orders.validate_order_ids(order_ids, user_id)
+#         Args:
+#             order_ids: The order IDs to validate (any format)
+#         """
+#         try:
+#             result = orders.validate_order_ids(order_ids, user_id)
             
-            response = f"📋 Order ID Validation:\n\n"
+#             response = f"📋 Order ID Validation:\n\n"
             
-            if result["found_ids"]:
-                response += f"✅ Found {len(result['found_ids'])} valid order(s): {', '.join(f'#{oid}' for oid in result['found_ids'])}\n\n"
+#             if result["found_ids"]:
+#                 response += f"✅ Found {len(result['found_ids'])} valid order(s): {', '.join(f'#{oid}' for oid in result['found_ids'])}\n\n"
             
-            if result["not_found_ids"]:
-                response += f"❌ Not found or not yours: {', '.join(f'#{oid}' for oid in result['not_found_ids'])}\n\n"
+#             if result["not_found_ids"]:
+#                 response += f"❌ Not found or not yours: {', '.join(f'#{oid}' for oid in result['not_found_ids'])}\n\n"
             
-            if result["invalid_ids"]:
-                response += f"⚠️ Invalid format: {', '.join(result['invalid_ids'])}\n\n"
+#             if result["invalid_ids"]:
+#                 response += f"⚠️ Invalid format: {', '.join(result['invalid_ids'])}\n\n"
             
-            if result["found_ids"]:
-                response += "Would you like to proceed with the refund for these orders?"
-            else:
-                response += "No valid orders found. Please check your order numbers and try again."
+#             if result["found_ids"]:
+#                 response += "Would you like to proceed with the refund for these orders?"
+#             else:
+#                 response += "No valid orders found. Please check your order numbers and try again."
             
-            return response
-        except Exception as e:
-            return f"Error validating order IDs: {str(e)}"
+#             return response
+#         except Exception as e:
+#             return f"Error validating order IDs: {str(e)}"
     
-    return validate_order_ids
+#     return validate_order_ids
 
 
 def create_get_policy_tool(user_id: int):
@@ -295,24 +295,108 @@ def create_get_order_facts_tool(user_id: int):
             response += f"**Order ID:** #{facts['order_id']}\n"
             response += f"**Item ID:** #{facts['order_item_id']}\n"
             response += f"**Order Status:** {facts['order_status']}\n"
-            response += f"**Ordered:** {facts['created_at']} ({facts['days_since_order']} days ago)\n"
+            # response += f"**Ordered:** {facts['created_at']} ({facts['days_since_order']} days ago)\n"
             
-            if facts['is_delivered']:
-                response += f"**Delivered:** {facts['delivered_at']} ({facts['days_since_delivery']} days ago)\n"
-            else:
-                response += f"**Delivered:** Not yet delivered\n"
+            # if facts['is_delivered']:
+            #     response += f"**Delivered:** {facts['delivered_at']} ({facts['days_since_delivery']} days ago)\n"
+            # else:
+            #     response += f"**Delivered:** Not yet delivered\n"
             
             response += f"\n**Max Refund Amount:** ${facts['max_refund_amount']/100:.2f}\n"
             response += f"**Breakdown:** {facts['refund_breakdown']}\n"
             
-            if facts['existing_refund_status']:
-                response += f"\n⚠️ **Existing Refund:** {facts['existing_refund_status']}\n"
+            # if facts['existing_refund_status']:
+            #     response += f"\n⚠️ **Existing Refund:** {facts['existing_refund_status']}\n"
             
             return response
         except Exception as e:
             return f"Error getting order facts: {str(e)}"
     
     return get_order_facts
+
+
+def create_check_eligibility_tool(user_id: int):
+    """Tool to check refund eligibility based on time windows and existing refunds"""
+    
+    @tool
+    def check_refund_eligibility(order_id: str | int, order_item_id: str | int, refund_type: str) -> str:
+        """
+        Check if an order item is eligible for a refund based on:
+        - Time since order placement
+        - Time since delivery (if applicable)
+        - Existing refund requests
+        - Refund type specific requirements
+        
+        Args:
+            order_id: The order ID
+            order_item_id: The specific item ID within the order
+            refund_type: The type of refund being requested (e.g., DAMAGED_ITEM, MISSING_ITEM)
+        """
+        try:
+            # Convert to int if string
+            order_id = int(order_id)
+            order_item_id = int(order_item_id)
+            
+            facts = refunds.get_order_facts(order_id, order_item_id, user_id)
+            
+            if "error" in facts:
+                return f"❌ {facts['message']}"
+            
+            # Get policy for this refund type to check time windows
+            policy = policies.get_policy_by_category(refund_type)
+            
+            response = "🔍 **Refund Eligibility Check**\n\n"
+            response += f"**Order ID:** #{facts['order_id']}\n"
+            response += f"**Item ID:** #{facts['order_item_id']}\n"
+            response += f"**Refund Type:** {refund_type}\n\n"
+            
+            # Check order date
+            response += f"**Order Date:** {facts['created_at']} ({facts['days_since_order']} days ago)\n"
+            
+            # Check delivery status
+            if facts['is_delivered']:
+                response += f"**Delivery Date:** {facts['delivered_at']} ({facts['days_since_delivery']} days ago)\n"
+            else:
+                response += f"**Delivery Status:** Not yet delivered\n"
+            
+            response += "\n**Eligibility Status:**\n"
+            
+            # Check for existing refunds
+            if facts.get('existing_refund_status'):
+                response += f"⚠️ **Existing Refund:** {facts['existing_refund_status']}\n"
+                response += "This item already has a refund request. Duplicate refunds are not allowed.\n"
+                return response
+            else:
+                response += "✅ No existing refund found\n"
+            
+            # Check time windows based on policy
+            # Most policies have 30-day windows from delivery or order
+            if facts['is_delivered']:
+                if facts['days_since_delivery'] > 30:
+                    response += f"❌ **Time Window:** This item was delivered {facts['days_since_delivery']} days ago, which exceeds the standard 30-day refund window.\n"
+                    response += "\n💡 **Recommendation:** This case may require manual review. Consider raising a support ticket.\n"
+                else:
+                    response += f"✅ **Time Window:** Within the 30-day refund window (delivered {facts['days_since_delivery']} days ago)\n"
+            else:
+                # For undelivered items, check days since order
+                if facts['days_since_order'] > 90:
+                    response += f"⚠️ **Time Window:** Order placed {facts['days_since_order']} days ago with no delivery record.\n"
+                else:
+                    response += f"✅ **Time Window:** Order placed {facts['days_since_order']} days ago\n"
+            
+            # Check order status
+            response += f"✅ **Order Status:** {facts['order_status']}\n"
+            
+            response += f"\n**Max Refund Amount:** ${facts['max_refund_amount']/100:.2f}\n"
+            
+            if policy:
+                response += f"\n📋 Review the {policy['title']} policy for specific requirements and documentation needed.\n"
+            
+            return response
+        except Exception as e:
+            return f"Error checking eligibility: {str(e)}"
+    
+    return check_refund_eligibility
 
 
 def create_calculate_refund_tool(user_id: int):
@@ -361,6 +445,7 @@ def create_process_refund_tool(user_id: int):
         refund_type: str,
         reason: str,
         quantity: str | int | None = None,
+        status: str | None = None,
         evidence: str | None = None
     ) -> str:
         """
@@ -372,6 +457,7 @@ def create_process_refund_tool(user_id: int):
             refund_type: Type from taxonomy (e.g., DAMAGED_ITEM, MISSING_ITEM)
             reason: Detailed explanation for the refund
             quantity: Optional - specific quantity to refund
+            status: str- refund status (PENDING, APPROVED, REJECTED)
             evidence: Optional - description or reference to uploaded evidence
         """
         try:
@@ -382,7 +468,7 @@ def create_process_refund_tool(user_id: int):
             
             # Calculate refund amount
             calc = refunds.calculate_refund_amount(order_item_id, quantity)
-            
+
             # Create refund record
             refund_id = refunds.create_refund(
                 order_item_id=order_item_id,
@@ -390,17 +476,17 @@ def create_process_refund_tool(user_id: int):
                 reason=reason,
                 amount=calc["total_refund"],
                 evidence=evidence,
-                quantity=quantity
+                quantity=quantity,
+                status=status
             )
             
             response = f"✅ **Refund Request Submitted!**\n\n"
             response += f"**Refund ID:** #{refund_id}\n"
-            response += f"**Status:** PENDING REVIEW\n"
+            response += f"**Status:** Approved\n"
             response += f"**Amount:** ${calc['total_refund']/100:.2f}\n\n"
-            response += f"Your refund request has been submitted and will be reviewed within 24-48 hours. "
             response += f"You'll receive a confirmation email once processed.\n\n"
             response += f"Is there anything else I can help you with?"
-            
+
             return response
         except Exception as e:
             return f"Error submitting refund: {str(e)}"
