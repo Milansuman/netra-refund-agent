@@ -228,6 +228,40 @@ def get_refund_status(refund_id: int) -> dict | None:
         "refund_type": result[0][7]
     }
 
+def get_user_refunds(user_id: int) -> list[dict]:
+    """Get all refunds for a specific user"""
+    result = db.execute(
+        """select or_.id, or_.status, or_.amount, or_.reason, or_.created_at,
+                  or_.processed_at, oi.id as item_id, oi.order_id, p.title as product_name,
+                  rt.reason as refund_type, o.created_at as order_date
+           from order_refunds or_
+           inner join order_items oi on or_.order_item_id = oi.id
+           inner join products p on oi.product_id = p.id
+           inner join refund_taxonomy rt on or_.refund_taxonomy_id = rt.id
+           inner join orders o on oi.order_id = o.id
+           where o.user_id = %s
+           order by or_.created_at desc;""",
+        (user_id,)
+    )
+    
+    refunds = []
+    for row in result:
+        refunds.append({
+            "id": row[0],
+            "status": row[1],
+            "amount": row[2],
+            "reason": row[3],
+            "created_at": row[4].isoformat() if row[4] else None,
+            "processed_at": row[5].isoformat() if row[5] else None,
+            "item_id": row[6],
+            "order_id": row[7],
+            "product_name": row[8],
+            "refund_type": row[9],
+            "order_date": row[10].isoformat() if row[10] else None
+        })
+    
+    return refunds
+
 def approve_refund(refund_id: int) -> bool:
     """Approve a pending refund"""
     db.execute(

@@ -19,27 +19,20 @@ class RefundAgentTask(BaseTask):
         # Generate thread_id similar to chat endpoint in main.py
         thread_id = uuid4().hex if not session_id else session_id
         user_id = 1  # Using test user for simulation
-        order_item_ids = None
 
         # Invoke the agent graph and collect the response (similar to chat endpoint)
         final_message = ""
-        for chunk in invoke_graph(thread_id, message, user_id, order_item_ids):
+        for chunk in invoke_graph(thread_id, message, user_id):
             try:
                 # Parse the JSON chunk from the stream
                 chunk_data = json.loads(chunk.strip())
                 
-                # Check if this chunk contains a chat node update with AI messages
-                if "chat" in chunk_data:
-                    messages = chunk_data["chat"].get("messages", [])
-                    if messages:
-                        # Extract the AI's response from the last message
-                        last_msg = messages[-1]
-                        if isinstance(last_msg, dict) and last_msg.get("type") == "ai":
-                            final_message = last_msg.get("content", "")
-                        elif isinstance(last_msg, str):
-                            final_message = last_msg
-                        elif hasattr(last_msg, "content"):
-                            final_message = last_msg.content #type: ignore
+                # Check for new streaming format: {"type": "message", "content": "..."}
+                if chunk_data.get("type") == "message" and chunk_data.get("content"):
+                    final_message = chunk_data["content"]
+                elif chunk_data.get("type") == "error":
+                    # Handle error responses
+                    final_message = f"Error: {chunk_data.get('content', 'Unknown error')}"
             except (json.JSONDecodeError, KeyError, AttributeError):
                 # Skip malformed or incomplete chunks
                 continue

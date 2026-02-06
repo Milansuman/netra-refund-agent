@@ -10,8 +10,6 @@ import json
 
 from models import users, orders
 from agent import invoke_graph, clear_thread
-
-from contextlib import asynccontextmanager
 from db import db
 import os
 from netra import Netra
@@ -60,9 +58,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-with open(".progress", "w") as f:
-    f.write("True")
 
 @app.get("/healthcheck")
 def healthcheck():
@@ -128,9 +123,7 @@ def get_orders(
 
 class ChatRequest(BaseModel):
     prompt: str
-    thread_id: str | None = None  # Frontend manages this now
-    order_item_ids: list[str] | None = None
-
+    thread_id: str | None = None
 
 @app.post("/chat")
 def chat(
@@ -150,18 +143,23 @@ def chat(
     """
     try:
         # Generate new thread_id if not provided
-        thread_id = chat.thread_id or str(uuid.uuid4())
+        current_thread = ""
+        if chat.thread_id == None:
+            print("new thread")
+            current_thread = str(uuid.uuid4())
+        else:
+            current_thread = chat.thread_id
 
         # Get the user's ID from the session
         user_id = user["id"]
 
         def generate():
             # First, yield the thread_id so frontend can track it
-            yield json.dumps({"thread_id": thread_id}) + "\n"
+            yield json.dumps({"thread_id": current_thread}) + "\n"
             # Then yield the agent response chunks
             # Note: We pass user_id so the agent can fetch their orders
             for chunk in invoke_graph(
-                thread_id, chat.prompt, user_id, chat.order_item_ids
+                current_thread, chat.prompt, user_id
             ):
                 yield chunk
 
@@ -184,8 +182,6 @@ def clear_chat(
     """
     try:
         success = clear_thread(thread_id)
-        with open(".progress", "w") as f:
-            f.write("False")
         if success:
             return {"message": "Thread cleared successfully"}
         else:

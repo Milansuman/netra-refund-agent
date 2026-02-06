@@ -221,6 +221,7 @@ dependencies = [
     { name = "netra-sdk" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "python-dotenv" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -234,6 +235,7 @@ requires-dist = [
     { name = "netra-sdk", path = "netra-sdk-py-develop.zip" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.2" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "rich", specifier = ">=14.3.1" },
 ]
 
 [[package]]
