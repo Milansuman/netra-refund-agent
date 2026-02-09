@@ -4,6 +4,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langchain_litellm import ChatLiteLLM
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage
 from typing import TypedDict, Any
 import json
@@ -18,18 +19,22 @@ load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 _agent_llm = None
 _summarizer_llm = None
 
 if GROQ_API_KEY:
-    _agent_llm = ChatGroq(api_key=GROQ_API_KEY, model="meta-llama/llama-4-scout-17b-16e-instruct") #type: ignore
+    _agent_llm = ChatGroq(api_key=GROQ_API_KEY, model="openai/gpt-oss-120b") #type: ignore
     _summarizer_llm = ChatGroq(api_key=GROQ_API_KEY, model="groq/compound") #type: ignore
 elif LITELLM_API_KEY:
     _agent_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4o")
     _summarizer_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4-turbo")
+elif GOOGLE_API_KEY:
+    _agent_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-3-flash-preview")
+    _summarizer_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-2.5-flash-lite")
 else:
-    raise ValueError("LITELLM_API_KEY or GROQ_API_KEY not set")
+    raise ValueError("LITELLM_API_KEY, GROQ_API_KEY or GOOGLE_API_KEY not set")
 
 # Get tool schemas by creating a temporary instance
 # We'll use the actual user_id when executing in tool_node
