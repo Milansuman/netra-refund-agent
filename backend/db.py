@@ -42,6 +42,7 @@ class Database:
             raise ValueError("DATABASE_URL not found")
 
         self.database_url = DATABASE_URL
+        self.return_real = False
 
         # Connection for regular app queries
         self.connection = psycopg.connect(DATABASE_URL)
@@ -163,7 +164,4 @@ class Database:
         finally:
             cursor.close()
 
-
-# Create a single instance of Database
-# This is called a "singleton pattern" - there's only one db object
 db = Database()

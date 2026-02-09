@@ -1,1 +1,1 @@
-curl http://localhost:8000/run-simulation/b7e09b66-2ccc-4610-8fa5-591c50d61ad6
+Invoke-RestMethod -Method Post -Uri "http://localhost:8000/run-simulation/312523fc-9810-4621-aebd-796ffece13e0"
