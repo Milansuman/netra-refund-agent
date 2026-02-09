@@ -13,6 +13,7 @@ from agent import invoke_graph, clear_thread
 from db import db
 import os
 from netra import Netra
+import evaluate
 
 Netra.init(
     headers=f"x-api-key={os.getenv('NETRA_API_KEY')}",
@@ -187,6 +188,18 @@ def clear_chat(
         else:
             response.status_code = 500
             return {"detail": "Failed to clear thread"}
+    except Exception as e:
+        print(e)
+        response.status_code = 400
+        return {"detail": str(e)}
+
+@app.post("/run-simulation/:dataset_id")
+def run_simulation(dataset_id: str, response: Response):
+    try:
+        evaluate.run_simulation(dataset_id=dataset_id)
+        return {
+            "detail": "Simulation executed successfully"
+        }
     except Exception as e:
         print(e)
         response.status_code = 400

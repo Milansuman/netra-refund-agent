@@ -41,6 +41,13 @@ class RefundAgentTask(BaseTask):
             message=final_message,
             session_id=thread_id
         )
+    
+def run_simulation(dataset_id: str) -> None:
+    Netra.simulation.run_simulation( #type: ignore
+        name="Refund Agent Simulation",
+        dataset_id=dataset_id,
+        task=RefundAgentTask()
+    )
 
 
 def main():
@@ -51,11 +58,8 @@ def main():
         trace_content=True
     )
 
-    Netra.simulation.run_simulation( #type: ignore
-        name="Refund Agent Simulation",
-        dataset_id="b7e09b66-2ccc-4610-8fa5-591c50d61ad6",
-        task=RefundAgentTask()
-    )
+    run_simulation("b7e09b66-2ccc-4610-8fa5-591c50d61ad6")
 
+    
 if  __name__ == "__main__":
     main()
