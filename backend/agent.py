@@ -298,10 +298,16 @@ def invoke_graph(
     try:
         for chunk in graph.stream(updated_state, config=config, stream_mode="updates"): #type: ignore
             if "chat" in chunk and len(chunk["chat"]["messages"][-1].content) > 0:
-                yield json.dumps({
-                    "type": "message",
-                    "content": chunk["chat"]["messages"][-1].content
-                })
+                if isinstance(chunk["chat"]["messages"][-1].content, list):
+                    yield json.dumps({
+                        "type": "message",
+                        "content": chunk["chat"]["messages"][-1].content[0]["text"]
+                    })
+                elif isinstance(chunk["chat"]["messages"][-1].content, str): 
+                    yield json.dumps({
+                        "type": "message",
+                        "content": chunk["chat"]["messages"][-1].content
+                    })
     except Exception as e:
         print(e)
         yield json.dumps({
