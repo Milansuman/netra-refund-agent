@@ -172,7 +172,7 @@ function OrderCard({ order }: { order: Order }) {
                 <span className="text-xs text-neutral-500">Qty: {item?.quantity ?? 0}</span>
               </div>
             </div>
-            <span className="text-neutral-400 font-mono">${(item?.price ?? 0).toFixed(2)}</span>
+            <span className="text-neutral-400 font-mono">₹{(item?.price ?? 0).toFixed(2)}</span>
           </div>
         ))}
       </div>
@@ -186,7 +186,7 @@ function OrderCard({ order }: { order: Order }) {
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total</span>
-            <span className="font-semibold text-indigo-400">${(order?.paid_amount ?? 0).toFixed(2)}</span>
+            <span className="font-semibold text-indigo-400">₹{(order?.paid_amount ?? 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -260,7 +260,7 @@ function ProductCard({ data }: { data: ProductData }) {
                 </div>
               </div>
               <div className="text-right">
-                <span className="block font-semibold text-white">${(item?.unit_price ?? 0).toFixed(2)}</span>
+                <span className="block font-semibold text-white">₹{(item?.unit_price ?? 0).toFixed(2)}</span>
                 <span className="text-[10px] text-neutral-600">per unit</span>
               </div>
             </div>
@@ -277,7 +277,7 @@ function ProductCard({ data }: { data: ProductData }) {
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total Paid</span>
-            <span className="font-bold text-purple-400 text-lg">${(data?.total_paid ?? 0).toFixed(2)}</span>
+            <span className="font-bold text-purple-400 text-lg">₹{(data?.total_paid ?? 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
