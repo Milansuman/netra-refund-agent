@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response, Request, Cookie, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -22,21 +23,21 @@ Netra.init(
     trace_content=True
 )
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     # Startup: Setup the database tables for the checkpointer
-#     try:
-#         db.setup_checkpointer()
-#         db.push()
-#         print("INFO: Database initialized (Checkpointer + Migrations)")
-#     except Exception as e:
-#         print(f"WARNING: Could not setup checkpointer: {e}")
-#     yield
-#     # Shutdown logic (if any) can go here
-#     db.close()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Setup the database tables for the checkpointer
+    try:
+        db.setup_checkpointer()
+        db.push()
+        print("INFO: Database initialized (Checkpointer + Migrations)")
+    except Exception as e:
+        print(f"WARNING: Could not setup checkpointer: {e}")
+    yield
+    # Shutdown logic (if any) can go here
+    db.close()
 
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 
 # Dependencies

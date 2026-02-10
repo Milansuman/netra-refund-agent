@@ -5,6 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langchain_litellm import ChatLiteLLM
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage
 from typing import TypedDict, Any
 import json
@@ -20,6 +21,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 _agent_llm = None
 _summarizer_llm = None
@@ -33,6 +35,9 @@ elif LITELLM_API_KEY:
 elif GOOGLE_API_KEY:
     _agent_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-3-flash-preview")
     _summarizer_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-2.5-flash-lite")
+elif OPENAI_API_KEY:
+    _agent_llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4o") #type: ignore
+    _summarizer_llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4-turbo") #type: ignore
 else:
     raise ValueError("LITELLM_API_KEY, GROQ_API_KEY or GOOGLE_API_KEY not set")
 
@@ -138,7 +143,7 @@ def summarizer_node(state: RefundAgentState) -> dict:
     messages = state["messages"]
 
     messages.append(HumanMessage(
-        content="Summarize this conversation into 6000 tokens or less"
+        content="Summarize this conversation into 6000 tokens or less. Prioritize details like order id, product name, refund reason and refund eligibility over everything else."
     ))
 
     response = _summarizer_llm.invoke(messages) #type: ignore

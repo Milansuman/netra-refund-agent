@@ -18,7 +18,7 @@ COPY . .
 EXPOSE 8000
 
 # Create startup script to run migrations then start server
-RUN echo '#!/bin/sh\nuv run push.py\nfastapi run main.py --host 0.0.0.0 --port 8000' > /app/start.sh && \
+RUN echo '#!/bin/sh\nfastapi run main.py --host 0.0.0.0 --port 8000' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Run in production mode with uvicorn

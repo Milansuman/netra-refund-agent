@@ -121,16 +121,16 @@ class RefundAgentTools:
                     })
                 
                 facts = validation["facts"]
-                return json.dumps({
-                    "order_id": facts["order_id"],
-                    "order_item_id": facts["order_item_id"],
-                    "order_status": facts["order_status"],
-                    "days_since_order": facts["days_since_order"],
-                    "days_since_delivery": facts["days_since_delivery"],
-                    "is_delivered": facts["is_delivered"],
-                    "max_refund_amount": facts["max_refund_amount"],
-                    "refund_breakdown": facts["refund_breakdown"]
-                })
+                # return json.dumps({
+                #     "order_id": facts["order_id"],
+                #     "order_item_id": facts["order_item_id"],
+                #     "order_status": facts["order_status"],
+                #     "days_since_order": facts["days_since_order"],
+                #     "days_since_delivery": facts["days_since_delivery"],
+                #     "is_delivered": facts["is_delivered"],
+                #     "max_refund_amount": facts["max_refund_amount"],
+                #     "refund_breakdown": facts["refund_breakdown"]
+                # })
 
             except Exception as e:
                 return json.dumps({"error": str(e)})
