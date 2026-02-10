@@ -195,9 +195,9 @@ def clear_chat(
         return {"detail": str(e)}
 
 @app.post("/run-simulation/{dataset_id}")
-def run_simulation(dataset_id: str, response: Response):
+def run_simulation(dataset_id: str, response: Response, failed: bool = False):
     try:
-        db.return_real = True
+        db.return_real = not failed
         evaluate.run_simulation(dataset_id=dataset_id)
         return {
             "detail": "Simulation executed successfully"
