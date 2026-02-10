@@ -33,8 +33,8 @@ elif LITELLM_API_KEY:
     _agent_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4o")
     _summarizer_llm = ChatLiteLLM(api_key=LITELLM_API_KEY, api_base="https://llm.keyvalue.systems", model="litellm_proxy/gpt-4-turbo")
 elif GOOGLE_API_KEY:
-    _agent_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-3-flash-preview")
-    _summarizer_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-2.5-flash-lite")
+    _agent_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-2.0-flash-lite")
+    _summarizer_llm = ChatGoogleGenerativeAI(google_api_key=GOOGLE_API_KEY, model="gemini-2.0-flash-lite")
 elif OPENAI_API_KEY:
     _agent_llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4o") #type: ignore
     _summarizer_llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4-turbo") #type: ignore
