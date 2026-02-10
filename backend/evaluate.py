@@ -103,7 +103,6 @@ class RefundAgentTask(BaseTask):
     
     def run(self, message: str, session_id: Optional[str] = None) -> TaskResult:
         # Generate thread_id similar to chat endpoint in main.py
-        raise ValueError("test exception")
         thread_id = uuid4().hex if not session_id else session_id
         user_id = 1  # Using test user for simulation
 
