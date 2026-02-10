@@ -23,6 +23,8 @@ Netra.init(
     trace_content=True
 )
 
+Netra.set_tenant_id("velora")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Setup the database tables for the checkpointer
@@ -154,6 +156,8 @@ def chat(
 
         # Get the user's ID from the session
         user_id = user["id"]
+        Netra.set_user_id(user["username"])
+        Netra.set_session_id(user["session_id"] if user["session_id"] else "default")
 
         def generate():
             # First, yield the thread_id so frontend can track it
