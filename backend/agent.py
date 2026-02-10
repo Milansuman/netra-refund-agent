@@ -149,8 +149,6 @@ def summarizer_node(state: RefundAgentState) -> dict:
 
     response = _summarizer_llm.invoke(messages) #type: ignore
 
-    print(response.content)
-
     messages = [
         system_message,
         response
@@ -231,9 +229,9 @@ def should_continue(state: RefundAgentState) -> str:
         return "tools"
     
     # Priority 2: Check if conversation exceeds 6000 tokens
-    token_count = count_tokens(messages)
-    if token_count > 6000:
-        return "summarizer"
+    # token_count = count_tokens(messages)
+    # if token_count > 6000:
+    #     return "summarizer"
     
     # Otherwise, end the conversation
     return "end"
