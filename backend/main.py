@@ -23,7 +23,7 @@ Netra.init(
     trace_content=True
 )
 
-Netra.set_tenant_id("velora")
+Netra.set_tenant_id("Velora")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -156,7 +156,7 @@ def chat(
 
         # Get the user's ID from the session
         user_id = user["id"]
-        Netra.set_user_id(user["username"])
+        Netra.set_user_id(user["username"].capitalize())
         Netra.set_session_id(user["session_id"] if user["session_id"] else "default")
 
         def generate():
