@@ -7,7 +7,6 @@ RUN pip install uv
 
 # Copy dependency files
 COPY pyproject.toml ./
-COPY netra-sdk-py-develop.zip ./
 # Install dependencies using uv
 RUN uv pip install --system -r pyproject.toml
 
