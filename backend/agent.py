@@ -15,6 +15,9 @@ import tiktoken
 from rich import print
 from models import refunds
 from datetime import date
+from netra.decorators import workflow, span, agent
+from netra import Netra, SpanType, ConversationType, SpanWrapper
+from utils import convert_tags_to_text
 
 load_dotenv()
 
@@ -129,92 +132,96 @@ def count_tokens(messages: list[AnyMessage]) -> int:
             total_tokens += len(tokenizer.encode(content))
     return total_tokens
 
+
 def chat_node(state: RefundAgentState) -> dict:
-    messages = state["messages"]
+    with Netra.start_span(name="Chat Node", as_type=SpanType.GENERATION) as chat_span:
+        messages = state["messages"]
 
-    response = _agent_llm.invoke(messages) #type: ignore
+        response = _agent_llm.invoke(messages) #type: ignore
 
-    messages.append(response)
+        messages.append(response)
 
-    return {
-        "messages": messages
-    }
+        return {
+            "messages": messages
+        }
 
 def summarizer_node(state: RefundAgentState) -> dict:
-    messages = state["messages"]
+    with Netra.start_span(name="Summarizer Node") as summarier_span:
+        messages = state["messages"]
 
-    messages.append(HumanMessage(
-        content="Summarize this conversation into 6000 tokens or less. Prioritize details like order id, product name, refund reason and refund eligibility over everything else."
-    ))
+        messages.append(HumanMessage(
+            content="Summarize this conversation into 6000 tokens or less. Prioritize details like order id, product name, refund reason and refund eligibility over everything else."
+        ))
 
-    response = _summarizer_llm.invoke(messages) #type: ignore
+        response = _summarizer_llm.invoke(messages) #type: ignore
 
-    messages = [
-        system_message,
-        response
-    ]
+        messages = [
+            system_message,
+            response
+        ]
 
-    return {
-        "messages": messages
-    }
+        return {
+            "messages": messages
+        }
 
 def tool_node(state: RefundAgentState) -> dict:
     """
     Process tool calls from the last AI message and execute them.
     Returns the tool results as ToolMessages.
     """
-    messages = state["messages"]
-    user_id = state["user_id"]
-    
-    last_message = messages[-1]
-    
-    if not isinstance(last_message, AIMessage) or not hasattr(last_message, 'tool_calls'):
-        return {"messages": messages}
-    
-    tool_calls = last_message.tool_calls
-    
-    if not tool_calls:
-        return {"messages": messages}
-    
-    # Get the actual tools with the real user_id
-    tools_by_name = RefundAgentTools(user_id).get_tools()
-    
-    tool_messages = []
-    for tool_call in tool_calls:
-        tool_name = tool_call.get("name")
-        tool_args = tool_call.get("args", {})
-        tool_id = tool_call.get("id")
+    with Netra.start_span(name="Tool Node", as_type=SpanType.TOOL) as tool_span:
+        messages = state["messages"]
+        user_id = state["user_id"]
         
-        try:
-            # Find and execute the tool
-            if tool_name in tools_by_name:
-                tool = tools_by_name[tool_name]
-                result = tool.invoke(tool_args)
-                
-                tool_messages.append(
-                    ToolMessage(
-                        content=result,
-                        tool_call_id=tool_id
+        last_message = messages[-1]
+        
+        if not isinstance(last_message, AIMessage) or not hasattr(last_message, 'tool_calls'):
+            return {"messages": messages}
+        
+        tool_calls = last_message.tool_calls
+        
+        if not tool_calls:
+            return {"messages": messages}
+        
+        # Get the actual tools with the real user_id
+        tools_by_name = RefundAgentTools(user_id).get_tools()
+        
+        tool_messages = []
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name")
+            tool_args = tool_call.get("args", {})
+            tool_id = tool_call.get("id")
+            
+            try:
+                # Find and execute the tool
+                if tool_name in tools_by_name:
+                    tool = tools_by_name[tool_name]
+                    result = tool.invoke(tool_args)
+                    
+                    tool_messages.append(
+                        ToolMessage(
+                            content=result,
+                            tool_call_id=tool_id
+                        )
                     )
-                )
-            else:
+                else:
+                    tool_messages.append(
+                        ToolMessage(
+                            content=json.dumps({"error": f"Tool '{tool_name}' not found"}),
+                            tool_call_id=tool_id,
+                            status="error"
+                        )
+                    )
+            except Exception as e:
                 tool_messages.append(
                     ToolMessage(
-                        content=json.dumps({"error": f"Tool '{tool_name}' not found"}),
+                        content=json.dumps({"error": str(e)}),
                         tool_call_id=tool_id,
                         status="error"
                     )
                 )
-        except Exception as e:
-            tool_messages.append(
-                ToolMessage(
-                    content=json.dumps({"error": str(e)}),
-                    tool_call_id=tool_id,
-                    status="error"
-                )
-            )
-    
-    return {"messages": messages + tool_messages}
+        
+        return {"messages": messages + tool_messages}
 
 
 def should_continue(state: RefundAgentState) -> str:
@@ -262,7 +269,7 @@ graph_builder.add_edge("summarizer", "chat")
 # Compile the graph with checkpointer
 graph = graph_builder.compile(checkpointer=db.checkpointer)
 
-
+@agent(name="Refund Agent")
 def invoke_graph(
     thread_id: str,
     prompt: str,
@@ -289,6 +296,7 @@ def invoke_graph(
 
     agent_state = graph.get_state(config) #type: ignore
 
+    messages: list[AnyMessage] = []
     if not agent_state.values or not agent_state.values.get("messages"):
         messages = [system_message, HumanMessage(content=prompt)]
     else:
@@ -298,10 +306,65 @@ def invoke_graph(
         "messages": messages,
         "user_id": user_id,
     }
-    
+
+    for message in messages:
+        if message.type == "human":
+            Netra.add_conversation(
+                conversation_type=ConversationType.INPUT,
+                content=convert_tags_to_text(str(message.content)),
+                role="User"
+            )
+        elif message.type == "ai":
+            Netra.add_conversation(
+                conversation_type=ConversationType.OUTPUT,
+                content=convert_tags_to_text(str(message.text)),
+                role="Ai"
+            )
+
+            for tool_call in message.tool_calls:
+                Netra.add_conversation(
+                    conversation_type=ConversationType.INPUT,
+                    content=f"""{tool_call["name"]}({tool_call["args"]})""",
+                    role="Tool Call"
+                )
+        elif message.type == "tool":
+            Netra.add_conversation(
+                conversation_type=ConversationType.OUTPUT,
+                content=message.content,
+                role="Tool Output"
+            )
+        elif message.type == "system":
+            Netra.add_conversation(
+                conversation_type=ConversationType.INPUT,
+                content=message.content,
+                role="System"
+            )
+
     try:
         for chunk in graph.stream(updated_state, config=config, stream_mode="updates"): #type: ignore
             if "chat" in chunk and len(chunk["chat"]["messages"][-1].content) > 0:
+                for message in chunk["chat"]["messages"]:
+                    message: AnyMessage = message
+                    if message.type == "ai":
+                        for tool_call in message.tool_calls:
+                            Netra.add_conversation(
+                                conversation_type=ConversationType.INPUT,
+                                content=f"""{tool_call["name"]}({tool_call["args"]})""",
+                                role="Tool Call"
+                            )
+                    if message.type == "tool":
+                        Netra.add_conversation(
+                            conversation_type=ConversationType.OUTPUT,
+                            content=message.content,
+                            role="Tool Output"
+                        )
+
+                Netra.add_conversation(
+                    conversation_type=ConversationType.OUTPUT,
+                    content=convert_tags_to_text(chunk["chat"]["messages"][-1].text),
+                    role="ai"
+                )
+
                 yield json.dumps({
                     "type": "message",
                     "content": chunk["chat"]["messages"][-1].text

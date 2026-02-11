@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from models import orders, refunds, tickets, products
 import json
 from db import db
+from netra.decorators import task
 
 @dataclass
 class RefundAgentTools:
@@ -12,6 +13,7 @@ class RefundAgentTools:
         """Return list of all tools bound to this instance"""
         
         @tool
+        @task
         def get_order_by_product_name(product_name: str) -> str:
             """
             Search for user's orders containing a specific product by name.
@@ -54,6 +56,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def get_order_by_id(order_id: int) -> str:
             """
             Get detailed information about a specific order by its ID.
@@ -96,6 +99,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def check_refund_eligibility(order_id: int, order_item_id: int):
             """
             Check if an order item is eligible for refund by verifying:
@@ -139,6 +143,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def process_refund(
             order_item_id: int,
             refund_type: str,
@@ -182,6 +187,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def escalate_to_manager(order_id: int, title: str, description: str | None = None) -> str:
             """
             Escalate an issue to a manager by creating a support ticket. Only execute this with the user's consent
@@ -211,6 +217,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def check_product_stock(product_id: int, quantity: int = 1) -> str:
             """
             Check if a product has sufficient stock available for replacement or new order.
@@ -237,6 +244,7 @@ class RefundAgentTools:
                 return json.dumps({"error": str(e)})
         
         @tool
+        @task
         def get_user_refunds() -> str:
             """
             Get all refund requests for the current user.

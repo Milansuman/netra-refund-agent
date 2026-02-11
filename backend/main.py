@@ -13,14 +13,16 @@ from models import users, orders
 from agent import invoke_graph, clear_thread
 from db import db
 import os
-from netra import Netra
+from netra import Netra, SpanWrapper
+from netra.instrumentation.instruments import InstrumentSet
 import evaluate
 
 Netra.init(
     headers=f"x-api-key={os.getenv('NETRA_API_KEY')}",
     app_name="Refund agent",
     debug_mode=True,
-    trace_content=True
+    trace_content=True,
+    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG} #type: ignore
 )
 
 Netra.set_tenant_id("Velora")
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-
+# span: SpanWrapper | None = None
 
 # Dependencies
 def validate_session(
@@ -148,8 +150,12 @@ def chat(
     try:
         # Generate new thread_id if not provided
         current_thread = ""
+        global span
         if chat.thread_id == None:
-            print("new thread")
+            # if span:
+            #     span.__exit__(exc_tb=None, exc_val=None, exc_type=None)
+            # span = Netra.start_span(name="Refund Agent")
+            # span.__enter__()
             current_thread = str(uuid.uuid4())
         else:
             current_thread = chat.thread_id
