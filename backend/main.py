@@ -158,8 +158,6 @@ def chat(
 
         # Get the user's ID from the session
         user_id = user["id"]
-        Netra.set_user_id(user["username"].capitalize())
-        Netra.set_session_id(current_thread)
 
         def generate():
             # First, yield the thread_id so frontend can track it

@@ -13,7 +13,7 @@ from db import db
 from tools import RefundAgentTools
 import tiktoken
 from rich import print
-from models import refunds
+from models import refunds, users
 from datetime import date
 from netra.decorators import workflow, span, agent
 from netra import Netra, SpanType, ConversationType, SpanWrapper
@@ -295,6 +295,11 @@ def invoke_graph(
             "checkpoint_ns": "",
         }
     }
+
+    user = users.get_user_by_id(user_id)
+
+    Netra.set_user_id(user["username"].capitalize())
+    Netra.set_session_id(thread_id)
 
     agent_state = graph.get_state(config) #type: ignore
 
