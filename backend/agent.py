@@ -45,14 +45,15 @@ else:
     raise ValueError("LITELLM_API_KEY, GROQ_API_KEY or GOOGLE_API_KEY not set")
 
 # Get tool schemas by creating a temporary instance
-# We'll use the actual user_id when executing in tool_node
-temp_tools_dict = RefundAgentTools(user_id=0).get_tools()
+# We'll use the actual user_id and thread_id when executing in tool_node
+temp_tools_dict = RefundAgentTools(user_id=0, thread_id="temp").get_tools()
 temp_tools = list(temp_tools_dict.values())
 _agent_llm = _agent_llm.bind_tools(temp_tools) #type: ignore
 
 class RefundAgentState(TypedDict):
     messages: list[AnyMessage]
     user_id: int
+    thread_id: str
 
 SYSTEM_PROMPT = """
 You are a helpful customer service agent specialized in handling refunds and order inquiries.
@@ -172,6 +173,7 @@ def tool_node(state: RefundAgentState) -> dict:
     with Netra.start_span(name="Tool Node", as_type=SpanType.TOOL) as tool_span:
         messages = state["messages"]
         user_id = state["user_id"]
+        thread_id = state["thread_id"]
         
         last_message = messages[-1]
         
@@ -183,8 +185,8 @@ def tool_node(state: RefundAgentState) -> dict:
         if not tool_calls:
             return {"messages": messages}
         
-        # Get the actual tools with the real user_id
-        tools_by_name = RefundAgentTools(user_id).get_tools()
+        # Get the actual tools with the real user_id and thread_id
+        tools_by_name = RefundAgentTools(user_id, thread_id).get_tools()
         
         tool_messages = []
         for tool_call in tool_calls:
@@ -305,6 +307,7 @@ def invoke_graph(
     updated_state: RefundAgentState = {
         "messages": messages,
         "user_id": user_id,
+        "thread_id": thread_id,
     }
 
     for message in messages:

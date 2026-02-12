@@ -99,7 +99,7 @@ def calculate_refund_amount(order_item_id: int, quantity: int | None = None) -> 
         "breakdown": breakdown
     }
 
-def get_order_facts(order_id: int, order_item_id: int, user_id: int) -> dict:
+def get_order_facts(order_id: int, order_item_id: int, user_id: int, thread_id: str) -> dict:
     """
     Get factual information about an order for eligibility checking.
     Returns raw facts without making eligibility decisions.
@@ -127,10 +127,10 @@ def get_order_facts(order_id: int, order_item_id: int, user_id: int) -> dict:
     if not item_check or item_check[0][0] != order_id:
         return {"error": "ITEM_MISMATCH", "message": "Item does not belong to this order"}
     
-    # Check if already refunded
+    # Check if already refunded in this thread
     existing_refund = db.execute(
-        "select status, amount from order_refunds where order_item_id = %s;",
-        (order_item_id,)
+        "select status, amount from order_refunds where order_item_id = %s and thread_id = %s;",
+        (order_item_id, thread_id)
     )
     
     refund_status = None
@@ -163,12 +163,12 @@ def get_order_facts(order_id: int, order_item_id: int, user_id: int) -> dict:
         "existing_refund_status": refund_status
     }
 
-def validate_basic_constraints(order_id: int, order_item_id: int, user_id: int) -> dict:
+def validate_basic_constraints(order_id: int, order_item_id: int, user_id: int, thread_id: str) -> dict:
     """
     Validate only the basic constraints: ownership, item match, no existing refund.
     Returns {"valid": True} or {"valid": False, "error": ..., "message": ...}
     """
-    facts = get_order_facts(order_id, order_item_id, user_id)
+    facts = get_order_facts(order_id, order_item_id, user_id, thread_id)
     
     if "error" in facts:
         return {"valid": False, "error": facts["error"], "message": facts["message"]}
@@ -182,7 +182,8 @@ def create_refund(
     amount: int,
     evidence: str | None = None,
     status: str | None = "PENDING",
-    quantity: int | None = None
+    quantity: int | None = None,
+    thread_id: str | None = None
 ) -> int:
     """Create a refund record in the database"""
     taxonomy_id = get_refund_taxonomy_id(refund_type)
@@ -192,10 +193,10 @@ def create_refund(
     
     result = db.execute(
         """insert into order_refunds 
-           (order_item_id, refund_taxonomy_id, reason, status, amount, evidence)
-           values (%s, %s, %s, %s, %s, %s)
+           (order_item_id, refund_taxonomy_id, reason, status, amount, evidence, thread_id)
+           values (%s, %s, %s, %s, %s, %s, %s)
            returning id;""",
-        (order_item_id, taxonomy_id, reason, status, amount, evidence)
+        (order_item_id, taxonomy_id, reason, status, amount, evidence, thread_id)
     )
     
     return result[0][0]
@@ -228,21 +229,36 @@ def get_refund_status(refund_id: int) -> dict | None:
         "refund_type": result[0][7]
     }
 
-def get_user_refunds(user_id: int) -> list[dict]:
-    """Get all refunds for a specific user"""
-    result = db.execute(
-        """select or_.id, or_.status, or_.amount, or_.reason, or_.created_at,
-                  or_.processed_at, oi.id as item_id, oi.order_id, p.title as product_name,
-                  rt.reason as refund_type, o.created_at as order_date
-           from order_refunds or_
-           inner join order_items oi on or_.order_item_id = oi.id
-           inner join products p on oi.product_id = p.id
-           inner join refund_taxonomy rt on or_.refund_taxonomy_id = rt.id
-           inner join orders o on oi.order_id = o.id
-           where o.user_id = %s
-           order by or_.created_at desc;""",
-        (user_id,)
-    )
+def get_user_refunds(user_id: int, thread_id: str | None = None) -> list[dict]:
+    """Get all refunds for a specific user, optionally filtered by thread_id"""
+    if thread_id:
+        result = db.execute(
+            """select or_.id, or_.status, or_.amount, or_.reason, or_.created_at,
+                      or_.processed_at, oi.id as item_id, oi.order_id, p.title as product_name,
+                      rt.reason as refund_type, o.created_at as order_date
+               from order_refunds or_
+               inner join order_items oi on or_.order_item_id = oi.id
+               inner join products p on oi.product_id = p.id
+               inner join refund_taxonomy rt on or_.refund_taxonomy_id = rt.id
+               inner join orders o on oi.order_id = o.id
+               where o.user_id = %s and or_.thread_id = %s
+               order by or_.created_at desc;""",
+            (user_id, thread_id)
+        )
+    else:
+        result = db.execute(
+            """select or_.id, or_.status, or_.amount, or_.reason, or_.created_at,
+                      or_.processed_at, oi.id as item_id, oi.order_id, p.title as product_name,
+                      rt.reason as refund_type, o.created_at as order_date
+               from order_refunds or_
+               inner join order_items oi on or_.order_item_id = oi.id
+               inner join products p on oi.product_id = p.id
+               inner join refund_taxonomy rt on or_.refund_taxonomy_id = rt.id
+               inner join orders o on oi.order_id = o.id
+               where o.user_id = %s
+               order by or_.created_at desc;""",
+            (user_id,)
+        )
     
     refunds = []
     for row in result:
@@ -281,3 +297,9 @@ def reject_refund(refund_id: int, rejection_reason: str) -> bool:
         (rejection_reason, refund_id)
     )
     return True
+
+def clear_refunds() -> None:
+    """
+    Clear the refunds table
+    """
+    db.execute("delete from order_refunds;");

@@ -1,0 +1,1 @@
+ALTER TABLE public.order_refunds ADD thread_id text NULL;

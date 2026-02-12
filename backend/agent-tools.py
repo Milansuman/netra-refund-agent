@@ -7,6 +7,7 @@ from db import db
 @dataclass
 class RefundAgentTools:
     user_id: int
+    thread_id: str
 
     def get_tools(self):
         """Return list of all tools bound to this instance"""
@@ -111,7 +112,7 @@ class RefundAgentTools:
                 JSON string with eligibility status and details
             """
             try:
-                validation = refunds.validate_basic_constraints(order_id, order_item_id, self.user_id)
+                validation = refunds.validate_basic_constraints(order_id, order_item_id, self.user_id, self.thread_id)
                 
                 if not validation["valid"]:
                     return json.dumps({
@@ -165,7 +166,8 @@ class RefundAgentTools:
                     reason=reason,
                     amount=calc["total_refund"],
                     evidence=evidence,
-                    status="PENDING"
+                    status="PENDING",
+                    thread_id=self.thread_id
                 )
                 
                 return json.dumps({
@@ -243,7 +245,7 @@ class RefundAgentTools:
                 JSON string with list of user's refunds or error message
             """
             try:
-                user_refunds = refunds.get_user_refunds(self.user_id)
+                user_refunds = refunds.get_user_refunds(self.user_id, self.thread_id)
                 
                 if not user_refunds:
                     return json.dumps({"message": "No refunds found for this user"})
