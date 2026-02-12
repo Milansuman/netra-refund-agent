@@ -93,16 +93,16 @@ type ProductItem = {
   name: string;
   description: string;
   quantity: number;
-  unit_price: number;
+  price: number;
   tax_percent: number;
   discounts: string[];
 };
 
 type ProductData = {
-  order_id: number;
+  id: number;
   status: string;
   payment_method: string;
-  total_paid: number;
+  paid_amount: number;
   items: ProductItem[];
 };
 
@@ -221,7 +221,7 @@ function ProductCard({ data }: { data: ProductData }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-purple-400" />
-            <span className="font-medium text-neutral-200">Order #{data?.order_id ?? "N/A"}</span>
+            <span className="font-medium text-neutral-200">Order #{data?.id ?? "N/A"}</span>
           </div>
           <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
             {status}
@@ -260,7 +260,7 @@ function ProductCard({ data }: { data: ProductData }) {
                 </div>
               </div>
               <div className="text-right">
-                <span className="block font-semibold text-white">₹{(item?.unit_price ?? 0).toFixed(2)}</span>
+                <span className="block font-semibold text-white">₹{(item?.price ?? 0).toFixed(2)}</span>
                 <span className="text-[10px] text-neutral-600">per unit</span>
               </div>
             </div>
@@ -277,7 +277,7 @@ function ProductCard({ data }: { data: ProductData }) {
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total Paid</span>
-            <span className="font-bold text-purple-400 text-lg">₹{(data?.total_paid ?? 0).toFixed(2)}</span>
+            <span className="font-bold text-purple-400 text-lg">₹{(data?.paid_amount ?? 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -304,8 +304,23 @@ export function AskAssistantDialog() {
   }, [messages, loading]);
 
   // Preserve chat history when dialog closes
-  const handleOpenChange = (isOpen: boolean) => {
+  const handleOpenChange = async (isOpen: boolean) => {
     setOpen(isOpen);
+
+    if (!isOpen) {
+      if (threadId) {
+        try {
+          await fetch(`http://localhost:8000/chat/${threadId}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+        } catch (error) {
+          console.error("Failed to clear chat on server:", error);
+        }
+      }
+      setMessages([]);
+      setThreadId(null);
+    }
   };
 
   async function sendMessage(content?: string) {
@@ -382,33 +397,35 @@ export function AskAssistantDialog() {
               // Handle the new streaming format: {"type": "message", "content": "..."}
               if (chunkData.type === "message" && chunkData.content) {
                 const content = chunkData.content;
-                
+
                 setMessages((prev) => {
                   const updated = [...prev];
                   const lastMsg = updated[updated.length - 1];
-                  
+
                   if (lastMsg && lastMsg.role === "assistant" && lastMsg.id === assistantMessageId) {
-                    // Check for ORDERS tag
+                    // Check for ORDERS tag - parse JSON directly as array
                     const ordersMatch = content.match(/<ORDERS>([\s\S]*?)<\/ORDERS>/);
                     if (ordersMatch) {
                       try {
                         const parsed = JSON.parse(ordersMatch[1]);
-                        // Backend returns {"orders": [...]} so extract the array
-                        lastMsg.orders = parsed.orders || parsed;
+                        // Backend returns array directly: [{...}, {...}]
+                        lastMsg.orders = Array.isArray(parsed) ? parsed : [parsed];
                         lastMsg.content = content.replace(/<ORDERS>[\s\S]*?<\/ORDERS>/, "").trim();
                       } catch (e) {
+                        console.error("Failed to parse ORDERS JSON:", e);
                         lastMsg.content = content;
                       }
                     }
-                    // Check for ORDER tag
+                    // Check for ORDER tag - parse JSON directly as object
                     else if (content.match(/<ORDER>([\s\S]*?)<\/ORDER>/)) {
                       const orderMatch = content.match(/<ORDER>([\s\S]*?)<\/ORDER>/);
                       try {
                         const parsed = JSON.parse(orderMatch![1]);
-                        // Backend returns {"order": {...}} so extract the object
-                        lastMsg.productData = parsed.order || parsed;
+                        // Backend returns object directly: {...}
+                        lastMsg.productData = parsed;
                         lastMsg.content = content.replace(/<ORDER>[\s\S]*?<\/ORDER>/, "").trim();
                       } catch (e) {
+                        console.error("Failed to parse ORDER JSON:", e);
                         lastMsg.content = content;
                       }
                     }
@@ -417,7 +434,7 @@ export function AskAssistantDialog() {
                       lastMsg.content = content;
                     }
                   }
-                  
+
                   return updated;
                 });
               } else if (chunkData.type === "error") {
@@ -546,7 +563,7 @@ export function AskAssistantDialog() {
                   <button
                     key={agent.id}
                     onClick={() => {
-                      if(agent.id === "refund_agent") setSelectedAgent(agent.id)
+                      if (agent.id === "refund_agent") setSelectedAgent(agent.id)
                     }}
                     className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-indigo-500/30 transition-all text-left group hover:shadow-lg hover:shadow-indigo-500/10"
                   >
