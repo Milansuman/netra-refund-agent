@@ -37,7 +37,8 @@ class RefundAgentTools:
                                 "id": item["id"],
                                 "name": item["product"]["title"],
                                 "quantity": item["quantity"],
-                                "price": item["unit_price"] / 100.0  # Convert cents to dollars
+                                "price": item["unit_price"] / 100.0,  # Convert cents to dollars
+                                "tax_percent": item["tax_percent"]
                             })
                     
                     if matching_items:

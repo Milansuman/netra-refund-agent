@@ -596,12 +596,10 @@ export function AskAssistantDialog() {
                   </div>
                   <div className="space-y-2">
                     <p className="font-medium text-lg text-white">
-                      Hello! I&apos;m your {agents.find(a => a.id === selectedAgent)?.name}.
+                      Refunds & Returns
                     </p>
                     <p className="text-sm text-neutral-400 max-w-[260px] mx-auto leading-relaxed">
-                      {selectedAgent === "refund_agent"
-                        ? "I can help you process returns, check eligibility, and track your refunds."
-                        : "I'm here to assist you with your inquiries."}
+                      Request refunds, replacements and view refund updates
                     </p>
                   </div>
 
@@ -611,7 +609,6 @@ export function AskAssistantDialog() {
                         <button
                           key={text}
                           onClick={() => {
-                            setInput(text);
                             sendMessage(text);
                           }}
                           className="px-4 py-2 text-xs font-medium rounded-full bg-white/5 border border-white/10 text-neutral-300 hover:border-indigo-500/50 hover:text-indigo-300 hover:bg-white/10 transition-all shadow-sm"
