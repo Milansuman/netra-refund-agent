@@ -46,7 +46,7 @@ def format_orders_to_text(orders_data: list) -> str:
         
         lines.append(f"Order #{order_id}")
         lines.append(f"Status: {status}")
-        lines.append(f"Total: ${total:.2f}")
+        lines.append(f"Total: ₹{total:.2f}")
         
         items = order.get('items', [])
         if items:
@@ -61,6 +61,7 @@ def format_orders_to_text(orders_data: list) -> str:
 
 def convert_tags_to_text(message: str) -> str:
     """Replace <ORDER> and <ORDERS> tags with human-friendly text."""
+    
     
     # Replace <ORDER>...</ORDER> tags
     def replace_order(match):
