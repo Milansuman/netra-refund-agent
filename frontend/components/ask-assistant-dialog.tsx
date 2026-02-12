@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, MessageSquare, Trash2, Sparkles, Bot, Package, CreditCard, ShoppingBag } from "lucide-react";
+import { Send, MessageSquare, Trash2, Sparkles, Bot, Package, CreditCard, ShoppingBag, HandCoins, IndianRupee} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import "@/styles/markdown.css";
 
@@ -473,7 +473,7 @@ export function AskAssistantDialog() {
       id: "refund_agent",
       name: "Refunds",
       description: "Process returns, refunds, and replacements for your orders.",
-      icon: Sparkles,
+      icon: IndianRupee,
       color: "from-violet-500 to-indigo-600",
       bgColor: "bg-indigo-50",
       borderColor: "border-indigo-200"
