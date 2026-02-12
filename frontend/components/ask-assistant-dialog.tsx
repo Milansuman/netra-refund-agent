@@ -599,7 +599,7 @@ export function AskAssistantDialog() {
                       Refunds & Returns
                     </p>
                     <p className="text-sm text-neutral-400 max-w-[260px] mx-auto leading-relaxed">
-                      Request refunds, replacements and view refund updates
+                      Process returns, refunds, and replacements for your orders.
                     </p>
                   </div>
 
