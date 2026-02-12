@@ -473,7 +473,7 @@ export function AskAssistantDialog() {
       id: "refund_agent",
       name: "Refunds",
       description: "Process returns, refunds, and replacements for your orders.",
-      icon: IndianRupee,
+      icon: Sparkles,
       color: "from-violet-500 to-indigo-600",
       bgColor: "bg-indigo-50",
       borderColor: "border-indigo-200"
