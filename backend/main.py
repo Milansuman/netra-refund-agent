@@ -1,7 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response, Request, Cookie, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel
 from psycopg.errors import UniqueViolation
 from typing import Annotated
@@ -16,6 +14,9 @@ import os
 from netra import Netra, SpanWrapper
 from netra.instrumentation.instruments import InstrumentSet
 import evaluate
+from fastapi import FastAPI, Response, Request, Cookie, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 Netra.init(
     headers=f"x-api-key={os.getenv('NETRA_API_KEY')}",
@@ -23,8 +24,8 @@ Netra.init(
     environment="development",
     debug_mode=True,
     trace_content=True,
-    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG}, #type: ignore
-    enable_root_span=True
+    # instruments={InstrumentSet.FASTAPI},
+    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG, InstrumentSet.OPENAI, InstrumentSet.LITELLM, InstrumentSet.REQUESTS, InstrumentSet.HTTPX}, #type: ignore
 )
 
 @asynccontextmanager
