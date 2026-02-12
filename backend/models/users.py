@@ -24,6 +24,19 @@ def login(username_or_email: str, password: str) -> str:
 def logout(session_id: str) -> None:
     db.execute("delete from sessions where id = %s;", (session_id,))
 
+def get_user_by_id(user_id: int) -> User:
+    users = db.execute("select id, username, email from users where id = %s;", (user_id,))
+    if len(users) > 0:
+        id, username, email = users[0]
+        return {
+            "id": id,
+            "email": email,
+            "username": username,
+            "session_id": None
+        }
+    else:
+        raise ValueError("User does not exist")
+
 def get_session_user(session_id: str | None) -> User:
     # If no session_id provided, return the first user
     if session_id is None:

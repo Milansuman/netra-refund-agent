@@ -22,7 +22,8 @@ Netra.init(
     app_name="Refund agent",
     debug_mode=True,
     trace_content=True,
-    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG} #type: ignore
+    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG}, #type: ignore
+    enable_root_span=True
 )
 
 Netra.set_tenant_id("Velora")
@@ -150,12 +151,7 @@ def chat(
     try:
         # Generate new thread_id if not provided
         current_thread = ""
-        global span
         if chat.thread_id == None:
-            # if span:
-            #     span.__exit__(exc_tb=None, exc_val=None, exc_type=None)
-            # span = Netra.start_span(name="Refund Agent")
-            # span.__enter__()
             current_thread = str(uuid.uuid4())
         else:
             current_thread = chat.thread_id
@@ -163,7 +159,7 @@ def chat(
         # Get the user's ID from the session
         user_id = user["id"]
         Netra.set_user_id(user["username"].capitalize())
-        Netra.set_session_id(user["session_id"] if user["session_id"] else "default")
+        Netra.set_session_id(current_thread)
 
         def generate():
             # First, yield the thread_id so frontend can track it

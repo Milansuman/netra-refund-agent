@@ -7,7 +7,7 @@ from uuid import uuid4
 from agent import invoke_graph
 import json
 from utils import convert_tags_to_text, format_order_to_text
-from models import refunds
+from models import refunds, users
 
 load_dotenv()
 
@@ -25,6 +25,12 @@ class RefundAgentTask(BaseTask):
 
         thread_id = uuid4().hex if not session_id else session_id
         user_id = 1
+
+        user = users.get_user_by_id(user_id)
+
+        Netra.set_user_id(user["username"].capitalize())
+        Netra.set_tenant_id("Velora")
+        Netra.set_session_id(thread_id)
 
         final_message = ""
         for chunk in invoke_graph(thread_id, message, user_id):
