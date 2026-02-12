@@ -301,6 +301,7 @@ def invoke_graph(
 
     Netra.set_user_id(user["username"].capitalize())
     Netra.set_session_id(thread_id)
+    Netra.set_tenant_id("Velora")
 
     agent_state = graph.get_state(config) #type: ignore
 

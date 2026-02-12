@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Package, RotateCcw, Truck, CheckCircle2, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AskAssistantDialog } from "@/components/ask-assistant-dialog";
 
@@ -35,6 +34,8 @@ interface Order {
   status: string;
   paid_amount: number;
   payment_method: string;
+  created_at: string;
+  delivered_at: string | null;
 }
 
 interface OrderResponse {
@@ -75,6 +76,27 @@ export default function OrdersPage() {
       style: "currency",
       currency: "INR",
     }).format(priceInPaisa / 100);
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Pending";
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getDaysAgo = (dateString: string | null) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    return `${diffDays} days ago`;
   };
 
   const getStatusConfig = (status: string) => {
@@ -140,7 +162,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-indigo-50/30 font-sans text-neutral-900">
+    <main className="min-h-screen bg-neutral-200 font-sans text-neutral-900">
       {/* Decorative background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200/30 rounded-full blur-3xl"></div>
@@ -218,28 +240,43 @@ export default function OrdersPage() {
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   {/* Order Header */}
-                  <div className="bg-gradient-to-r from-neutral-50 to-white px-6 py-4 border-b border-neutral-100 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-6">
-                      <div>
-                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Order ID</p>
-                        <p className="font-semibold text-neutral-900">
-                          VEL-{order.id.toString().padStart(6, "0")}
-                        </p>
+                  <div className="bg-gradient-to-r from-neutral-50 to-white px-6 py-5 border-b border-neutral-100">
+                    <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                          <Package className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-400 uppercase tracking-wider mb-0.5">Order</p>
+                          <p className="font-bold text-lg text-neutral-900">
+                            #{order.id}
+                          </p>
+                        </div>
                       </div>
-                      <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
-                      <div className="hidden sm:block">
-                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total</p>
-                        <p className="font-semibold text-neutral-900">{formatPrice(order.paid_amount)}</p>
-                      </div>
-                      <div className="hidden sm:block h-8 w-px bg-neutral-200"></div>
-                      <div className="hidden sm:block">
-                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Payment</p>
-                        <p className="font-medium text-neutral-700 text-sm">{order.payment_method}</p>
+                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${statusConfig.color}`}>
+                        <StatusIcon className="h-3.5 w-3.5" />
+                        {statusConfig.label}
                       </div>
                     </div>
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${statusConfig.color}`}>
-                      <StatusIcon className="h-3.5 w-3.5" />
-                      {statusConfig.label}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="bg-white rounded-xl p-3 border border-neutral-100">
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Purchased</p>
+                        <p className="font-semibold text-neutral-900 text-sm">{formatDate(order.created_at)}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">{getDaysAgo(order.created_at)}</p>
+                      </div>
+                      <div className="bg-white rounded-xl p-3 border border-neutral-100">
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Delivered</p>
+                        <p className="font-semibold text-neutral-900 text-sm">{formatDate(order.delivered_at)}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          {order.delivered_at ? getDaysAgo(order.delivered_at) : "Not yet delivered"}
+                        </p>
+                      </div>
+                      <div className="bg-white rounded-xl p-3 border border-neutral-100">
+                        <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total Amount</p>
+                        <p className="font-bold text-neutral-900 text-lg">{formatPrice(order.paid_amount)}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">via {order.payment_method}</p>
+                      </div>
                     </div>
                   </div>
 
@@ -250,14 +287,6 @@ export default function OrdersPage() {
                         key={item.id}
                         className="flex gap-4 p-4 rounded-2xl hover:bg-neutral-50 transition-colors group/item"
                       >
-                        <div className="relative h-24 w-24 flex-shrink-0 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-50 overflow-hidden border border-neutral-200/60 group-hover/item:border-indigo-200 transition-colors">
-                          <Image
-                            src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=200&q=80"
-                            alt={item.product.title}
-                            fill
-                            className="object-cover group-hover/item:scale-105 transition-transform duration-300"
-                          />
-                        </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-neutral-900 group-hover/item:text-indigo-600 transition-colors">
                             {item.product.title}

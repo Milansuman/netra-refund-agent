@@ -20,13 +20,12 @@ import evaluate
 Netra.init(
     headers=f"x-api-key={os.getenv('NETRA_API_KEY')}",
     app_name="Refund agent",
+    environment="development",
     debug_mode=True,
     trace_content=True,
     block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG}, #type: ignore
     enable_root_span=True
 )
-
-Netra.set_tenant_id("Velora")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

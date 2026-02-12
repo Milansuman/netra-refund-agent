@@ -26,9 +26,11 @@ class Order(TypedDict):
     paid_amount: int
     payment_method: str
     order_items: list[OrderItem]
+    created_at: str
+    delivered_at: str | None
 
 def get_user_orders(user_id: int) -> list[Order]:
-    db_orders = db.execute("select id, status, paid_amount, payment_method from orders where user_id = %s;", (user_id,))
+    db_orders = db.execute("select id, status, paid_amount, payment_method, created_at, delivered_at from orders where user_id = %s;", (user_id,))
 
     orders: list[Order] = []
     for db_order in db_orders:
@@ -37,7 +39,9 @@ def get_user_orders(user_id: int) -> list[Order]:
             "order_items": [],
             "status": db_order[1],
             "paid_amount": db_order[2],
-            "payment_method": db_order[3]
+            "payment_method": db_order[3],
+            "created_at": db_order[4].isoformat() if db_order[4] else "",
+            "delivered_at": db_order[5].isoformat() if db_order[5] else None
         }
 
         db_order_items = db.execute("select order_items.id, order_items.quantity, order_items.unit_price, order_items.tax_percent, products.title, products.description, products.price, products.tax_percent from order_items inner join products on order_items.product_id = products.id where order_items.order_id = %s;", (order["id"],))
