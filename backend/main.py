@@ -25,7 +25,7 @@ Netra.init(
     debug_mode=True,
     trace_content=True,
     # instruments={InstrumentSet.FASTAPI},
-    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG, InstrumentSet.OPENAI, InstrumentSet.LITELLM, InstrumentSet.REQUESTS, InstrumentSet.HTTPX}, #type: ignore
+    block_instruments={InstrumentSet.LANGCHAIN, InstrumentSet.PSYCOPG, InstrumentSet.LITELLM, InstrumentSet.REQUESTS, InstrumentSet.HTTPX}, #type: ignore
 )
 
 @asynccontextmanager
