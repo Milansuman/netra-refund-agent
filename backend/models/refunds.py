@@ -82,14 +82,14 @@ def calculate_refund_amount(order_item_id: int, quantity: int | None = None) -> 
             # Fixed amount discount, proportional to quantity
             disc = int((amount * refund_quantity) / full_quantity)
             discount_amount += disc
-            discount_details.append(f"${disc/100:.2f} off")
+            discount_details.append(f"₹{disc/100:.2f} off")
     
     total_refund = item_price + tax_amount - discount_amount
     
-    breakdown = f"Item: ${item_price/100:.2f} + Tax: ${tax_amount/100:.2f}"
+    breakdown = f"Item: ₹{item_price/100:.2f} + Tax: ₹{tax_amount/100:.2f}"
     if discount_amount > 0:
-        breakdown += f" - Discounts: ${discount_amount/100:.2f} ({', '.join(discount_details)})"
-    breakdown += f" = ${total_refund/100:.2f}"
+        breakdown += f" - Discounts: ₹{discount_amount/100:.2f} ({', '.join(discount_details)})"
+    breakdown += f" = ₹{total_refund/100:.2f}"
     
     return {
         "item_price": item_price,

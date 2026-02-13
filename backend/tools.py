@@ -90,7 +90,7 @@ class RefundAgentTools:
                         "tax_percent": item["tax_percent"],
                         "discounts": [
                             f"{d['code']}: {d['percent']}% off" if d["percent"] 
-                            else f"{d['code']}: ${d['amount']/100:.2f} off" #type: ignore
+                            else f"{d['code']}: ₹{d['amount']/100:.2f} off" #type: ignore
                             for d in item["discounts"]
                         ]
                     } for item in order["order_items"]]
