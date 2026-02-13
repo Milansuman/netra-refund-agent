@@ -16,7 +16,7 @@ from rich import print
 from models import refunds, users
 from datetime import date
 from netra.decorators import workflow, span, agent
-from netra import Netra, SpanType, ConversationType, SpanWrapper
+from netra import Netra, SpanType, ConversationType, SpanWrapper, UsageModel
 from utils import convert_tags_to_text
 
 load_dotenv()
@@ -137,6 +137,19 @@ def chat_node(state: RefundAgentState) -> dict:
         response = _agent_llm.invoke(messages) #type: ignore
 
         messages.append(response)
+        input_usage = UsageModel(
+            units_used=response.usage_metadata["input_tokens"] if response.usage_metadata else 0,
+            usage_type="input",
+            model=str(response.response_metadata["model_name"])
+        )
+
+        output_usage = UsageModel(
+            units_used=response.usage_metadata["output_tokens"] if response.usage_metadata else 0,
+            usage_type="output",
+            model=str(response.response_metadata["model_name"])
+        )
+
+        chat_span.set_usage([input_usage, output_usage])
 
         return {
             "messages": messages
