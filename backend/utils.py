@@ -9,7 +9,7 @@ def format_order_to_text(order_data: dict) -> str:
     lines.append(f"Payment Method: {order_data.get('payment_method', 'N/A')}")
     
     total = order_data.get('total_paid') or order_data.get('paid_amount', 0)
-    lines.append(f"Total: ${total:.2f}")
+    lines.append(f"Total: ₹{total:.2f}")
     
     items = order_data.get('items', [])
     if items:
@@ -18,7 +18,7 @@ def format_order_to_text(order_data: dict) -> str:
             item_name = item.get('name', 'Unknown')
             qty = item.get('quantity', 1)
             price = item.get('unit_price') or item.get('price', 0)
-            lines.append(f"  - {item_name} (x{qty}) - ${price:.2f}")
+            lines.append(f"  - {item_name} (x{qty}) - ₹{price:.2f}")
             
             if 'description' in item and item['description']:
                 lines.append(f"    {item['description']}")
@@ -55,7 +55,7 @@ def format_orders_to_text(orders_data: list) -> str:
                 item_name = item.get('name', 'Unknown')
                 qty = item.get('quantity', 1)
                 price = item.get('price', 0)
-                lines.append(f"  - {item_name} (x{qty}) - ${price:.2f}")
+                lines.append(f"  - {item_name} (x{qty}) - ₹{price:.2f}")
     
     return "\n".join(lines)
 
