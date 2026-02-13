@@ -538,7 +538,7 @@ export function AskAssistantDialog() {
 
             <div>
               <DialogTitle className="text-base font-medium text-white flex items-center gap-2">
-                {selectedAgent ? agents.find(a => a.id === selectedAgent)?.name : "AI Assistant"}
+                Velora Assistant
                 <Sparkles className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
               </DialogTitle>
               <DialogDescription className="text-xs text-indigo-200/70">
