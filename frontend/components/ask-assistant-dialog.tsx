@@ -93,16 +93,19 @@ type ProductItem = {
   name: string;
   description: string;
   quantity: number;
-  price: number;
+  unit_price?: number;  // Preferred field for single order
+  price?: number;       // Fallback field
   tax_percent: number;
   discounts: string[];
 };
 
 type ProductData = {
-  id: number;
+  order_id?: number;    // Preferred field for single order
+  id?: number;          // Fallback field
   status: string;
   payment_method: string;
-  paid_amount: number;
+  total_paid?: number;  // Preferred field for single order
+  paid_amount?: number; // Fallback field
   items: ProductItem[];
 };
 
@@ -221,7 +224,7 @@ function ProductCard({ data }: { data: ProductData }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-purple-400" />
-            <span className="font-medium text-neutral-200">Order #{data?.id ?? "N/A"}</span>
+            <span className="font-medium text-neutral-200">Order #{data?.order_id || data?.id || "N/A"}</span>
           </div>
           <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold border ${statusClass}`}>
             {status}
@@ -260,7 +263,7 @@ function ProductCard({ data }: { data: ProductData }) {
                 </div>
               </div>
               <div className="text-right">
-                <span className="block font-semibold text-white">₹{(item?.price ?? 0).toFixed(2)}</span>
+                <span className="block font-semibold text-white">₹{(item?.unit_price || item?.price || 0).toFixed(2)}</span>
                 <span className="text-[10px] text-neutral-600">per unit</span>
               </div>
             </div>
@@ -277,7 +280,7 @@ function ProductCard({ data }: { data: ProductData }) {
           </div>
           <div className="text-right">
             <span className="text-xs text-neutral-500 mr-2">Total Paid</span>
-            <span className="font-bold text-purple-400 text-lg">₹{(data?.paid_amount ?? 0).toFixed(2)}</span>
+            <span className="font-bold text-purple-400 text-lg">₹{(data?.total_paid || data?.paid_amount || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
