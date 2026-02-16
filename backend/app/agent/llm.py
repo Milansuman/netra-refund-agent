@@ -18,4 +18,4 @@ elif config.OPENAI_API_KEY:
     agent_llm = ChatOpenAI(api_key=config.OPENAI_API_KEY, model="gpt-4.1") #type: ignore
 
 tools = create_refund_agent_tools(0, "DUMMY")
-agent_llm.bind_tools([tool for tool in tools.values()]) #type: ignore
+agent_llm = agent_llm.bind_tools([tool for tool in tools.values()]) #type: ignore

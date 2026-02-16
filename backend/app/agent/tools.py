@@ -4,7 +4,6 @@ import json
 from db.connections import db
 from netra.decorators import task
 
-
 def create_refund_agent_tools(user_id: int, thread_id: str):
     """
     Factory function to create refund agent tools bound to a specific user and thread.
