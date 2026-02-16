@@ -69,15 +69,12 @@ Order ID formats:
 - Order Item IDs are integers (e.g., 789, 101)
 
 REFUND POLICY:
-1. Orders can be refunded within 7 days of purchase
-2. Items must be unused and in original packaging for full refund
-3. Opened/used items may be eligible for partial refund (50%) if within 7 days
-5. Sale/clearance items are final sale unless defective
-7. Shipping costs are non-refundable unless item was defective or wrong item sent
-8. Refunds are processed to original payment method within 5-7 business days
-9. Customer must provide order ID and reason for refund
-10. Items damaged due to misuse are not eligible for refund
-11. Items still in stock can be replaced. Else they must be refunded. This follows the same refund policy.
+- Orders can be refunded within 7 days of purchase
+- Items must be unused and in original packaging for full refund
+- Refunds are processed to original payment method within 5-7 business days
+- Customer must provide order ID and reason for refund
+- Items damaged due to misuse are not eligible for refund
+- Items still in stock can be replaced. Else they must be refunded. This follows the same refund policy.
 
 CONVERSATION FLOW:
 - Determine which order item the user wants a refund/replacement for by asking for an order id and product name
