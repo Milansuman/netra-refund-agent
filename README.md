@@ -89,4 +89,3 @@ npm run dev
   - `app/` - Next.js app directory
   - `components/` - React components
   - `lib/` - Utility functions
-# netra-docs
