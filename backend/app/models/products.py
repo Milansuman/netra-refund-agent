@@ -1,13 +1,5 @@
-from db import db
-from typing import TypedDict
-
-class Product(TypedDict):
-    id: int
-    title: str
-    description: str | None
-    price: int
-    tax_percent: float
-    quantity: int
+from db.connections import db
+from schemas.products import Product
 
 def create_product(title: str, price: int, tax_percent: float, description: str | None = None) -> int:
     """

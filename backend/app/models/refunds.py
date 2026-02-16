@@ -1,23 +1,7 @@
-from db import db
-from typing import TypedDict, Literal
-from datetime import datetime, timedelta
+from db.connections import db
+from datetime import datetime
+from schemas.refunds import RefundTaxonomy, RefundCalculation
 
-class RefundTaxonomy(TypedDict):
-    title: str
-    description: str
-
-class RefundEligibility(TypedDict):
-    eligible: bool
-    reason: str
-    max_refund_amount: int
-    policy_violation: str | None
-
-class RefundCalculation(TypedDict):
-    item_price: int
-    tax_amount: int
-    discount_amount: int
-    total_refund: int
-    breakdown: str
 
 def get_refund_taxonomy() -> list[RefundTaxonomy]:
     db_refund_taxonomy = db.execute("select reason, description from refund_taxonomy;")

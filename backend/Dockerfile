@@ -16,9 +16,5 @@ COPY . .
 # Expose the port
 EXPOSE 8000
 
-# Create startup script to run migrations then start server
-RUN echo '#!/bin/sh\nfastapi run main.py --host 0.0.0.0 --port 8000' > /app/start.sh && \
-    chmod +x /app/start.sh
-
-# Run in production mode with uvicorn
-CMD ["/app/start.sh"]
+# Run the application using the built-in uvicorn runner
+CMD ["python", "app/main.py"]

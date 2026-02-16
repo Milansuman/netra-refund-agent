@@ -1,7 +1,6 @@
-from db import Database
+from db.connections import db
 
 def main():
-    db = Database()
     db.push()
     db.setup_checkpointer()
     db.close()

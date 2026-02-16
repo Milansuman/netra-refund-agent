@@ -1,33 +1,5 @@
-from db import db
-from typing import TypedDict
-
-class Product(TypedDict):
-    title: str
-    description: str | None
-    price: int
-    tax_percent: float
-
-class OrderDiscount(TypedDict):
-    code: str
-    percent: float | None
-    amount: int | None
-
-class OrderItem(TypedDict):
-    id: int
-    product: Product
-    discounts: list[OrderDiscount]
-    quantity: int
-    unit_price: int
-    tax_percent: float
-
-class Order(TypedDict):
-    id: int
-    status: str
-    paid_amount: int
-    payment_method: str
-    order_items: list[OrderItem]
-    created_at: str
-    delivered_at: str | None
+from db.connections import db
+from schemas.orders import Order, OrderItem
 
 def get_user_orders(user_id: int) -> list[Order]:
     db_orders = db.execute("select id, status, paid_amount, payment_method, created_at, delivered_at from orders where user_id = %s;", (user_id,))
@@ -63,6 +35,8 @@ def get_user_orders(user_id: int) -> list[Order]:
                 "tax_percent": item_tax_percent,
                 "unit_price": item_unit_price,
                 "product": {
+                    "id": None,
+                    "quantity": None,
                     "title": product_title,
                     "description": product_description,
                     "price": product_price,

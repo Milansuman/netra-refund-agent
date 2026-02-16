@@ -1,21 +1,3 @@
-"""
-DATABASE MODULE
-===============
-
-This module handles all database connections and operations.
-
-KEY CONCEPT: Connection Pooling
--------------------------------
-When multiple requests come in, they all need database connections.
-Instead of creating a new connection for each request (slow!), we use
-a "connection pool" - a group of pre-made connections that get reused.
-
-For LangGraph's checkpointer, we use a separate connection pool because:
-1. It needs to manage transaction state independently
-2. It uses PostgreSQL's "pipeline mode" for efficiency
-3. Sharing connections between the app and checkpointer causes conflicts
-"""
-
 import psycopg
 from psycopg_pool import ConnectionPool
 from dotenv import load_dotenv
@@ -23,11 +5,11 @@ import os
 import glob
 from typing import LiteralString, Optional, Union, Sequence, Mapping, Any, Iterable
 from langgraph.checkpoint.postgres import PostgresSaver
+from config import config
 
 load_dotenv()
 
 Params = Union[Sequence[Any], Mapping[str, Any]]
-
 
 class Database:
     """
@@ -37,20 +19,17 @@ class Database:
     """
 
     def __init__(self):
-        DATABASE_URL = os.getenv("DATABASE_URL")
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL not found")
 
-        self.database_url = DATABASE_URL
+        self.database_url = config.DATABASE_URL
         self.return_real = False
 
         # Connection for regular app queries
-        self.connection = psycopg.connect(DATABASE_URL)
+        self.connection = psycopg.connect(config.DATABASE_URL)
 
         # Create a separate connection pool for the checkpointer
         # This prevents the "failed to enter pipeline mode" error
         self.checkpointer_pool = ConnectionPool(
-            DATABASE_URL, min_size=1, max_size=5, open=True
+            config.DATABASE_URL, min_size=1, max_size=5, open=True
         )
 
         # Create checkpointer with the pool (not a single connection)
@@ -74,7 +53,7 @@ class Database:
         Run database migrations.
         Migrations are SQL files that update the database schema.
         """
-        migrations_path = "./migrations/*.sql"
+        migrations_path = "./app/db/migrations/*.sql"
         migration_files = sorted(glob.glob(migrations_path))
 
         if not migration_files:

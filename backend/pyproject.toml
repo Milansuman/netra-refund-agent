@@ -15,6 +15,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.0.4",
     "netra-sdk>=0.1.67",
     "psycopg[binary,pool]>=3.3.2",
+    "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
     "rich>=14.3.1",
 ]

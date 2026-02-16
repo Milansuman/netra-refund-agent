@@ -1,12 +1,6 @@
-from db import db
+from db.connections import db
 from hashlib import sha256
-from typing import TypedDict
-
-class User(TypedDict):
-    id: int
-    email: str
-    username: str
-    session_id: str | None
+from schemas.users import User
 
 def signup(username: str, email: str, password: str):
     db.execute("insert into users(email, password, username) values (%s,%s,%s);", (email, sha256(password.encode()).hexdigest(), username))
